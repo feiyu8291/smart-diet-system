@@ -1,7 +1,51 @@
--- 5. 预置食材字典 (diet_ingredient) - 续
+-- 1. 预置系统用户 (sys_user)
+INSERT INTO sys_user (user_id, real_name, phone_num, user_password, username, id_card_num, use_status)
+VALUES (1, '张大厨', '13800000000', 'e10adc3949ba59abbe56e057f20f883e', 'cooker', '110101199001011234', 0)
+ON CONFLICT (user_id) DO NOTHING;
+
+-- 2. 预置演示家庭组
+INSERT INTO diet_family_group (group_id, group_name, creator_user_id, cooldown_days)
+VALUES (1, '健康快乐一家人', 1, 3);
+
+-- 3. 预置家庭成员健康档案 (diet_user_health_profile)
+-- 做饭人：张大厨 (在线)
+INSERT INTO diet_user_health_profile (profile_id, user_id, group_id, group_role, member_name, member_relation,
+                                      member_gender, member_height, member_weight, member_age, activity_level,
+                                      target_weight, diet_speed, bmr_calories, tdee_calories, daily_target_calories)
+VALUES (1, 1, 1, 1, '张大厨', '本人', 1, 175.00, 85.00, 35, 2, 75.00, 0.50, 1780.00, 2450.00, 1950.00);
+
+-- 离线就餐成员：李四 (老婆)
+INSERT INTO diet_user_health_profile (profile_id, user_id, group_id, group_role, member_name, member_relation,
+                                      member_gender, member_height, member_weight, member_age, activity_level,
+                                      target_weight, diet_speed, bmr_calories, tdee_calories, daily_target_calories)
+VALUES (2, NULL, 1, 2, '李四', '配偶', 2, 162.00, 62.00, 32, 1, 52.00, 0.50, 1280.00, 1530.00, 1100.00);
+
+-- 离线就餐成员：小明 (儿子)
+INSERT INTO diet_user_health_profile (profile_id, user_id, group_id, group_role, member_name, member_relation,
+                                      member_gender, member_height, member_weight, member_age, activity_level,
+                                      target_weight, diet_speed, bmr_calories, tdee_calories, daily_target_calories)
+VALUES (3, NULL, 1, 2, '小明', '子女', 1, 130.00, 32.00, 8, 3, 32.00, 0.00, 1050.00, 1600.00, 1600.00);
+
+-- 4. 预置计划模板 (diet_plan)
+INSERT INTO diet_plan (plan_id, plan_name, total_days, plan_description)
+VALUES (1, '21天极速夏日轻食减脂计划', 21,
+        '本计划采用 3天轻食 + 1天正常饮食 的循环模式，帮助家庭成员温和减少油脂与高碳水摄入，主要食材以鸡胸肉、牛肉及西兰花为主。');
+
+INSERT INTO diet_plan (plan_id, plan_name, total_days, plan_description)
+VALUES (2, '家庭膳食营养调理计划', 14,
+        '注重每日微量元素摄入，不限制热量，以正常家常菜系搭配，保障蛋白质与膳食纤维全面平衡。');
+
+-- 5. 预置食材字典 (diet_ingredient)
 INSERT INTO diet_ingredient (ingredient_id, ingredient_name, calories, protein, fat, carbs, measure_unit,
                              condiment_flag)
-VALUES (8, '猪里脊肉', 143.00, 20.20, 6.20, 1.50, 'g', 0),
+VALUES (1, '鸡胸肉', 133.00, 24.60, 1.90, 0.60, 'g', 0),
+       (2, '牛里脊', 106.00, 22.30, 1.80, 0.20, 'g', 0),
+       (3, '西兰花', 34.00, 4.10, 0.60, 4.30, 'g', 0),
+       (4, '西红柿', 15.00, 0.90, 0.20, 3.30, 'g', 0),
+       (5, '鸡蛋', 143.00, 13.30, 8.80, 2.80, 'g', 0),
+       (6, '豆腐', 82.00, 8.10, 3.70, 4.20, 'g', 0),
+       (7, '青椒', 23.00, 1.00, 0.30, 4.50, 'g', 0),
+       (8, '猪里脊肉', 143.00, 20.20, 6.20, 1.50, 'g', 0),
        (9, '食用油', 899.00, 0.00, 99.80, 0.00, 'g', 1),
        (10, '食盐', 0.00, 0.00, 0.00, 0.00, 'g', 1),
        (11, '生抽', 65.00, 6.00, 0.10, 10.00, 'ml', 1),
