@@ -1,0 +1,359 @@
+/* 导入 Google 字体 */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+    /* 颜色变量 */
+    --primary: #000000;
+    --on-primary: #ffffff;
+    --ink: #000000;
+    --canvas: #ffffff;
+    --inverse-canvas: #000000;
+    --inverse-ink: #ffffff;
+    --on-inverse-soft: rgba(255, 255, 255, 0.16);
+    --hairline: #e6e6e6;
+    --hairline-soft: #f1f1f1;
+    --surface-soft: #f7f7f5;
+    --block-lime: #dceeb1;
+    --block-lilac: #c5b0f4;
+    --block-cream: #f4ecd6;
+    --block-pink: #efd4d4;
+    --block-mint: #c8e6cd;
+    --block-coral: #f3c9b6;
+    --block-navy: #1f1d3d;
+    --accent-magenta: #ff3d8b;
+    --semantic-success: #1ea64a;
+
+    /* 边角变量 */
+    --rounded-xs: 2px;
+    --rounded-sm: 6px;
+    --rounded-md: 8px;
+    --rounded-lg: 24px;
+    --rounded-xl: 32px;
+    --rounded-pill: 50px;
+    --rounded-full: 9999px;
+
+    /* 间距变量 */
+    --spacing-hair: 1px;
+    --spacing-xxs: 4px;
+    --spacing-xs: 8px;
+    --spacing-sm: 12px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    --spacing-xxl: 48px;
+    --spacing-section: 96px;
+
+    /* 字体设置 */
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* 基础重置 */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: var(--canvas);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.45;
+    overflow-x: hidden;
+}
+
+/* 排版层次 */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 500;
+    letter-spacing: -0.02em;
+}
+
+.display-xl {
+    font-size: 86px;
+    font-weight: 340;
+    line-height: 1.00;
+    letter-spacing: -1.72px;
+}
+
+.display-lg {
+    font-size: 64px;
+    font-weight: 340;
+    line-height: 1.10;
+    letter-spacing: -0.96px;
+}
+
+.headline {
+    font-size: 26px;
+    font-weight: 540;
+    line-height: 1.35;
+    letter-spacing: -0.26px;
+}
+
+.subhead {
+    font-size: 26px;
+    font-weight: 340;
+    line-height: 1.35;
+    letter-spacing: -0.26px;
+}
+
+.card-title {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.45;
+    letter-spacing: 0;
+}
+
+.body-lg {
+    font-size: 20px;
+    font-weight: 330;
+    line-height: 1.40;
+    letter-spacing: -0.14px;
+}
+
+.body-text {
+    font-size: 18px;
+    font-weight: 320;
+    line-height: 1.45;
+    letter-spacing: -0.26px;
+}
+
+.body-sm {
+    font-size: 16px;
+    font-weight: 330;
+    line-height: 1.45;
+    letter-spacing: -0.14px;
+}
+
+/* Mono 仅用于分类标签 (eyebrow) */
+.eyebrow {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 1.30;
+    letter-spacing: 0.54px;
+    text-transform: uppercase;
+}
+
+.caption {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.00;
+    letter-spacing: 0.60px;
+    text-transform: uppercase;
+}
+
+/* 按钮 (Buttons) - 严格遵循 Pill 药丸设计 */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--primary);
+    color: var(--on-primary);
+    font-size: 20px;
+    font-weight: 480;
+    line-height: 1.40;
+    letter-spacing: -0.10px;
+    border-radius: var(--rounded-pill);
+    padding: 10px 20px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.1s ease, background-color 0.1s ease;
+    user-select: none;
+}
+
+.btn-primary:active {
+    transform: scale(0.96);
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-size: 20px;
+    font-weight: 480;
+    line-height: 1.40;
+    letter-spacing: -0.10px;
+    border-radius: var(--rounded-pill);
+    padding: 8px 18px 10px; /* Asymmetric vertical optical nudge */
+    border: none;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+    box-shadow: none;
+    user-select: none;
+}
+
+.btn-secondary:hover {
+    background-color: var(--surface-soft);
+}
+
+.btn-secondary:active {
+    transform: scale(0.96);
+}
+
+/* 彻底禁用的药丸按钮样式 */
+.btn-primary:disabled, .btn-secondary:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+/* 圆形图标按钮 */
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background-color: var(--surface-soft);
+    color: var(--ink);
+    border-radius: var(--rounded-full);
+    border: none;
+    cursor: pointer;
+    transition: transform 0.1s ease, background-color 0.1s ease;
+}
+
+.btn-icon:hover {
+    background-color: var(--hairline-soft);
+}
+
+.btn-icon:active {
+    transform: scale(0.92);
+}
+
+.btn-icon-inverse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background-color: var(--on-inverse-soft);
+    color: var(--inverse-ink);
+    border-radius: var(--rounded-full);
+    border: none;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+}
+
+.btn-icon-inverse:active {
+    transform: scale(0.92);
+}
+
+/* 输入框 */
+.input-text {
+    width: 100%;
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 18px;
+    font-weight: 320;
+    border-radius: var(--rounded-md);
+    padding: 12px 14px;
+    border: 1px solid var(--hairline);
+    outline: none;
+    transition: border-color 0.1s ease;
+}
+
+.input-text:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary);
+}
+
+/* 核心布局色块 (Color-Block Sections) */
+.color-block {
+    border-radius: var(--rounded-lg);
+    padding: var(--spacing-xxl) !important;
+    transition: transform 0.2s ease;
+}
+
+.color-block-lime {
+    background-color: var(--block-lime);
+    color: var(--ink);
+}
+
+.color-block-lilac {
+    background-color: var(--block-lilac);
+    color: var(--ink);
+}
+
+.color-block-cream {
+    background-color: var(--block-cream);
+    color: var(--ink);
+}
+
+.color-block-mint {
+    background-color: var(--block-mint);
+    color: var(--ink);
+}
+
+.color-block-pink {
+    background-color: var(--block-pink);
+    color: var(--ink);
+}
+
+.color-block-coral {
+    background-color: var(--block-coral);
+    color: var(--ink);
+}
+
+.color-block-navy {
+    background-color: var(--block-navy);
+    color: var(--inverse-ink);
+}
+
+/* 双色调线 */
+.hairline-border {
+    border: 1px solid var(--hairline);
+}
+
+.hairline-bottom {
+    border-bottom: 1px solid var(--hairline-soft);
+}
+
+/* 页面版心间距 */
+.content-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-lg);
+}
+
+.section-gap {
+    margin-bottom: var(--spacing-section);
+}
+
+/* Element Plus 样式覆盖 - 使其契合 DESIGN.md 规范 */
+.el-card {
+    border-radius: var(--rounded-lg) !important;
+    border: 1px solid var(--hairline) !important;
+    box-shadow: none !important;
+    background-color: var(--canvas) !important;
+    color: var(--ink) !important;
+}
+
+.el-dialog {
+    border-radius: var(--rounded-lg) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important;
+}
+
+.el-button {
+    border-radius: var(--rounded-pill) !important;
+    font-family: var(--font-sans) !important;
+}
+
+.el-input__wrapper {
+    border-radius: var(--rounded-md) !important;
+    box-shadow: 0 0 0 1px var(--hairline) inset !important;
+}
+
+.el-input__wrapper.is-focus {
+    box-shadow: 0 0 0 2px var(--primary) inset !important;
+}
+
+.el-select .el-input__wrapper.is-focus {
+    box-shadow: 0 0 0 2px var(--primary) inset !important;
+}

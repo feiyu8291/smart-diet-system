@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7.0-alpine
+    container_name: smart-diet-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+
+  smart-diet-backend:
+    build:
+      context: ./smart-diet-backend
+      dockerfile: Dockerfile
+    container_name: smart-diet-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=pro
+      # 外部 PostgreSQL 数据库连接参数 (支持宿主机环境变量覆写，默认连接本地)
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://${DB_HOST:-host.docker.internal}:5432/smart_diet
+      - SPRING_DATASOURCE_USERNAME=${DB_USER:-postgres}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-postgres}
+      
+      # 外部 MinIO 对象存储连接参数 (默认连接本地 9000 端口)
+      - MINIO_ENDPOINT=http://${MINIO_HOST:-host.docker.internal}:9000
+      - MINIO_BUCKET=smart-diet
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+
+      # Redis 连接参数
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PWD=
+      - REDIS_DB=0
+    extra_hosts:
+      # 支持在 Linux/Windows 容器中通过 host.docker.internal 顺利直连宿主机上的外部 PostgreSQL 和 MinIO 服务
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+    restart: always
+
+  smart-diet-frontend:
+    build:
+      context: ./smart-diet-frontend
+      dockerfile: Dockerfile
+    container_name: smart-diet-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - smart-diet-backend
+    restart: always
+
+volumes:
+  redis_data:

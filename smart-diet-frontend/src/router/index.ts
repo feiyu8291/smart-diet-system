@@ -1,0 +1,117 @@
+import {createRouter, createWebHistory} from 'vue-router'
+
+const routes = [
+    {
+        path: '/',
+        redirect: '/dashboard'
+    },
+    {
+        path: '/login',
+        name: 'Login',
+        component: () => import('../views/Login.vue'),
+        meta: {title: '登录 - 智能膳食系统'}
+    },
+    {
+        path: '/dashboard',
+        name: 'Dashboard',
+        component: () => import('../views/PlanDashboard.vue'),
+        meta: {title: '计划进度 - 智能膳食系统'}
+    },
+    {
+        path: '/meal-planner',
+        name: 'MealPlanner',
+        component: () => import('../views/FamilyMealPlanner.vue'),
+        meta: {title: '家庭配餐 - 智能膳食系统'}
+    },
+    {
+        path: '/family',
+        name: 'Family',
+        component: () => import('../views/FamilyManagement.vue'),
+        meta: {title: '家庭成员 - 智能膳食系统'}
+    },
+    {
+        path: '/dishes',
+        name: 'Dishes',
+        component: () => import('../views/DishLibrary.vue'),
+        meta: {title: '菜谱广场 - 智能膳食系统'}
+    },
+    {
+        path: '/weight',
+        name: 'Weight',
+        component: () => import('../views/WeightTracker.vue'),
+        meta: {title: '体重记录 - 智能膳食系统'}
+    },
+    {
+        path: '/system-setting',
+        name: 'SystemSetting',
+        component: () => import('../views/SystemSetting.vue'),
+        redirect: '/system-setting/user',
+        meta: {title: '系统设置 - 智能膳食系统'},
+        children: [
+            {
+                path: 'user',
+                name: 'UserManage',
+                component: () => import('../views/system/UserManage.vue'),
+                meta: {title: '用户管理 - 智能膳食系统'}
+            },
+            {
+                path: 'role',
+                name: 'RoleManage',
+                component: () => import('../views/system/RoleManage.vue'),
+                meta: {title: '角色管理 - 智能膳食系统'}
+            },
+            {
+                path: 'menu',
+                name: 'MenuManage',
+                component: () => import('../views/system/MenuManage.vue'),
+                meta: {title: '菜单管理 - 智能膳食系统'}
+            },
+            {
+                path: 'dict',
+                name: 'DictManage',
+                component: () => import('../views/system/DictManage.vue'),
+                meta: {title: '字典管理 - 智能膳食系统'}
+            },
+            {
+                path: 'file',
+                name: 'FileStorage',
+                component: () => import('../views/system/FileStorage.vue'),
+                meta: {title: '文件存储 - 智能膳食系统'}
+            },
+            {
+                path: 'login-log',
+                name: 'LoginLog',
+                component: () => import('../views/system/LoginLog.vue'),
+                meta: {title: '登录日志 - 智能膳食系统'}
+            },
+            {
+                path: 'op-log',
+                name: 'OperationLog',
+                component: () => import('../views/system/OperationLog.vue'),
+                meta: {title: '操作日志 - 智能膳食系统'}
+            }
+        ]
+    }
+]
+
+const router = createRouter({
+    history: createWebHistory(),
+    routes
+})
+
+// 全局路由守卫：Title 修改及登录拦截
+router.beforeEach((to, _from, next) => {
+    if (to.meta.title) {
+        document.title = to.meta.title as string
+    }
+
+    const token = localStorage.getItem('token')
+    if (to.path !== '/login' && !token) {
+        next('/login')
+    } else {
+        next()
+    }
+})
+
+export default router
+

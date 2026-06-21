@@ -1,0 +1,51 @@
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/smart_diet
+    username: postgres
+    password: postgres123
+
+  # Redis 配置（设置为 enabled: false 可禁用 Redis）
+  data:
+    redis:
+      #数据库索引
+      database: ${REDIS_DB:0}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PWD:123456}
+      #连接超时时间
+      timeout: 5000
+      # 连接池配置
+      lettuce:
+        pool:
+          # 连接池最大连接数
+          max-active: 30
+          # 连接池最大阻塞等待时间（毫秒），负值表示没有限制
+          max-wait: -1
+          # 连接池中的最大空闲连接数
+          max-idle: 20
+          # 连接池中的最小空闲连接数
+          min-idle: 1
+
+# 亚马逊S3协议云存储配置
+# 支持七牛云，阿里云OSS，腾讯云COS，华为云OBS，移动云EOS、MinIO等
+amz:
+  s3:
+    # 地域：MinIO无强制地域要求，自定义填写（如test）
+    region: fly-minio
+    # 地域对应的 endpoint：MinIO的S3 API端口（即Compose中映射的9000端口）
+    endPoint: http://localhost:9000
+    # 访问的域名：与endPoint一致（若配置了反向代理域名可替换）
+    domain: http://localhost:9000
+    # 账号的认证信息：对应Compose中配置的MINIO_ROOT_USER/MINIO_ROOT_PASSWORD
+    accessKey: hhxxadmin
+    secretKey: hhxx@2025
+    # 存储桶（Bucket）：需先在MinIO控制台创建对应的存储桶名称
+    defaultBucket: system_base_bucket
+    # 文件存储路径
+    timeFormat: yyyy-MM
+    # 强制路径模式
+    pathStyleAccess: true
+    # 后端服务预览地址
+    backendSever: http://localhost:8000/api/s3Storage/preview
+
