@@ -5,14 +5,26 @@
       <h1 class="display-lg">菜谱广场</h1>
     </div>
 
+    <!-- 饮食分类胶囊 (Airbnb 药丸风格) -->
+    <div class="category-strip">
+      <button
+          v-for="tab in categoryTabs"
+          :key="tab.value"
+          :class="['category-tab-btn', { active: activeCategory === tab.value }]"
+          @click="selectCategory(tab.value)"
+      >
+        {{ tab.label }}
+      </button>
+    </div>
+
     <!-- 1. 菜谱网格展示 -->
     <div class="dishes-grid">
       <div
-          v-for="dish in dishes"
+          v-for="dish in filteredDishes"
           :key="dish.dishId"
           class="dish-card-item hairline-border"
       >
-        <!-- 拿手菜勋章 (金黄色高饱和度便签小标志) -->
+        <!-- 拿手菜勋章 -->
         <div v-if="dish.signatureFlag === 1" class="signature-tag caption">
           ★ 拿手菜
         </div>
@@ -23,7 +35,7 @@
               class="card-img"
               alt="dish image"
           />
-          <!-- 上传成品图小操作面板 (悬浮在图片上) -->
+          <!-- 上传成品图小操作面板 -->
           <div class="upload-overlay">
             <el-upload
                 action=""
@@ -48,7 +60,7 @@
             {{ dish.dishName }}
           </h3>
 
-          <p class="body-sm" style="color: #666666; margin-bottom: var(--spacing-sm)">
+          <p class="body-sm" style="color: var(--ink-subtle); margin-bottom: var(--spacing-sm)">
             热量：{{ dish.calories }} kcal/100g | 饮食模式: {{ getDietModeName(dish.dietMode) }}
           </p>
 
@@ -65,7 +77,7 @@
       </div>
     </div>
 
-    <!-- 2. 做法步骤和原料大抽屉 (Drawer) -->
+    <!-- 2. 做法步骤和原料大抽屉 -->
     <el-drawer
         v-model="drawerVisible"
         title="菜品烹饪说明书"
@@ -78,7 +90,7 @@
           {{ selectedDishDetail.dish.dishName }}
         </h2>
 
-        <!-- 配方原料单 (Block-Cream) -->
+        <!-- 配方原料单 -->
         <div class="color-block color-block-cream info-block">
           <span class="caption">INGREDIENTS FORMULA</span>
           <h4 class="card-title" style="margin-bottom: var(--spacing-xs)">配方主料与调料</h4>
@@ -90,7 +102,7 @@
           </ul>
         </div>
 
-        <!-- 详细制作步骤 (Block-Lime) -->
+        <!-- 详细制作步骤 -->
         <div class="color-block color-block-lime info-block" style="margin-top: var(--spacing-md)">
           <span class="caption">COOKING STEPS</span>
           <h4 class="card-title" style="margin-bottom: var(--spacing-xs)">详细制作步骤</h4>
@@ -175,15 +187,37 @@
 </template>
 
 <script setup lang="ts">
-import {inject, onMounted, ref} from 'vue'
+import {computed, inject, onMounted, ref, unref} from 'vue'
 import {ElMessage} from 'element-plus'
 import request from '../utils/request'
 
-const groupId = inject<number>('groupId', 1)
+const activeGroupIdRef = inject<any>('groupId')
 const cookUserId = inject<number>('cookUserId', 1)
+
+const groupId = unref(activeGroupIdRef) || 1
 
 const dishes = ref<any[]>([])
 const members = ref<any[]>([])
+
+// 饮食分类胶囊
+const activeCategory = ref<any>('all')
+const categoryTabs = [
+  {label: '全部菜谱', value: 'all'},
+  {label: '轻食减脂', value: 1},
+  {label: '正常饮食', value: 0},
+  {label: '放纵餐', value: 2}
+]
+
+const filteredDishes = computed(() => {
+  if (activeCategory.value === 'all') {
+    return dishes.value
+  }
+  return dishes.value.filter(dish => dish.dietMode === activeCategory.value)
+})
+
+const selectCategory = (val: any) => {
+  activeCategory.value = val
+}
 
 // 抽屉详情
 const drawerVisible = ref(false)
@@ -253,7 +287,7 @@ const handleUploadImage = async (options: any, dish: any) => {
     })
     if (res.success) {
       ElMessage.success('成品打卡图片上传成功，MinIO 优先覆盖展示！')
-      loadDishes() // 重新载入，图片会被 MinIO 覆盖为最新成品图
+      loadDishes()
     } else {
       ElMessage.error(res.message || '上传失败')
     }
@@ -310,7 +344,40 @@ onMounted(() => {
 <style scoped>
 .header-section {
   margin-top: var(--spacing-xl);
+  margin-bottom: var(--spacing-sm);
+}
+
+.category-strip {
+  display: flex;
+  gap: var(--spacing-sm);
   margin-bottom: var(--spacing-lg);
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.category-tab-btn {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-pill);
+  background-color: var(--surface-1);
+  color: var(--ink-subtle);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.category-tab-btn:hover {
+  border-color: var(--hairline-strong);
+  color: var(--ink);
+}
+
+.category-tab-btn.active {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+  font-weight: 600;
 }
 
 .dishes-grid {
@@ -322,25 +389,28 @@ onMounted(() => {
 .dish-card-item {
   border-radius: var(--rounded-lg);
   overflow: hidden;
-  background-color: var(--canvas);
+  background-color: var(--surface-1);
+  border: 1px solid var(--hairline);
   position: relative;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .dish-card-item:hover {
   transform: translateY(-4px);
+  border-color: var(--hairline-strong);
 }
 
 .signature-tag {
   position: absolute;
   top: 12px;
   right: 12px;
-  background-color: #ffd700;
-  color: var(--ink);
+  background-color: var(--surface-2);
+  border: 1px solid var(--hairline);
+  color: var(--primary-hover);
   padding: 4px 10px;
-  border-radius: var(--rounded-pill);
+  border-radius: var(--rounded-xs);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   z-index: 10;
 }
 
@@ -387,9 +457,10 @@ onMounted(() => {
 
 .count-badge {
   font-size: 11px;
-  background-color: var(--surface-soft);
+  background-color: var(--surface-2);
+  border: 1px solid var(--hairline);
   padding: 2px 8px;
-  border-radius: var(--rounded-pill);
+  border-radius: var(--rounded-xs);
 }
 
 .dish-name {
@@ -432,7 +503,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   padding: 4px 0;
-  border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+  border-bottom: 1px dashed var(--hairline);
 }
 
 .steps-list {
@@ -449,11 +520,12 @@ onMounted(() => {
 }
 
 .step-badge {
-  background-color: var(--primary);
-  color: var(--on-primary);
+  background-color: var(--surface-2);
+  border: 1px solid var(--hairline);
+  color: var(--primary-hover);
   width: 22px;
   height: 22px;
-  border-radius: var(--rounded-full);
+  border-radius: var(--rounded-xs);
   display: flex;
   align-items: center;
   justify-content: center;

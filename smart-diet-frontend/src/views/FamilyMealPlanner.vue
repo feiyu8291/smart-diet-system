@@ -45,8 +45,8 @@
 
     <!-- 2. 联合配餐台 -->
     <div class="color-block color-block-navy planner-main-box">
-      <span class="caption" style="color: var(--block-lime)">DIET GENERATOR</span>
-      <h2 class="display-lg" style="color: #ffffff; margin-bottom: var(--spacing-md)">智能膳食发生器</h2>
+      <span class="caption" style="color: var(--primary-hover)">DIET GENERATOR</span>
+      <h2 class="display-lg" style="margin-bottom: var(--spacing-md)">智能膳食发生器</h2>
 
       <div class="planner-form">
         <!-- 用餐日期 -->
@@ -85,7 +85,7 @@
 
         <!-- 生成大按钮 -->
         <button class="btn-primary" @click="handleGenerateRecommend"
-                style="align-self: flex-end; background-color: var(--block-lime); color: var(--ink)">
+                style="align-self: flex-end;">
           智能推荐
         </button>
       </div>
@@ -131,7 +131,7 @@
             <div v-for="item in calculatedPortions" :key="item.profileId + '_' + item.dishId" class="portion-item">
               <div class="portion-user">
                 <span class="body-text text-bold">{{ item.memberName }}</span>
-                <span class="body-sm" style="color: #666666">吃【{{ item.dishName }}】</span>
+                <span class="body-sm" style="color: var(--ink-subtle)">吃【{{ item.dishName }}】</span>
               </div>
               <div class="portion-gram eyebrow">
                 {{ item.recommendWeight }} g
@@ -198,11 +198,12 @@
 </template>
 
 <script setup lang="ts">
-import {inject, onMounted, ref} from 'vue'
+import {inject, onMounted, ref, unref} from 'vue'
 import {ElMessage} from 'element-plus'
 import request from '../utils/request'
 
-const groupId = inject<number>('groupId', 1)
+const activeGroupIdRef = inject<any>('groupId')
+const groupId = unref(activeGroupIdRef) || 1
 const cookUserId = inject<number>('cookUserId', 1)
 
 // 冷却天数
@@ -468,7 +469,7 @@ onMounted(() => {
 }
 
 .form-group label {
-  color: #cccccc;
+  color: var(--ink-subtle);
 }
 
 .preview-results {
@@ -486,29 +487,31 @@ onMounted(() => {
   border-radius: var(--rounded-lg);
   overflow: hidden;
   position: relative;
-  background-color: var(--canvas);
+  background-color: var(--surface-1);
+  border: 1px solid var(--hairline);
 }
 
 .wish-banner {
   position: absolute;
   top: 12px;
   left: 12px;
-  background-color: var(--accent-magenta);
+  background-color: var(--primary);
   color: var(--on-primary);
   padding: 4px 10px;
-  border-radius: var(--rounded-pill);
+  border-radius: var(--rounded-sm);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   z-index: 10;
 }
 
 .sig-badge {
-  background-color: #ffd700;
-  color: var(--ink);
+  background-color: var(--surface-2);
+  border: 1px solid var(--hairline);
+  color: var(--primary-hover);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 500;
   padding: 2px 6px;
-  border-radius: var(--rounded-pill);
+  border-radius: var(--rounded-xs);
 }
 
 .dish-preview-img {
@@ -540,7 +543,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   padding: var(--spacing-xs) 0;
-  border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+  border-bottom: 1px dashed var(--hairline);
 }
 
 .portion-list {
@@ -555,7 +558,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: var(--spacing-xs) 0;
-  border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+  border-bottom: 1px dashed var(--hairline);
 }
 
 .portion-user {
@@ -587,6 +590,6 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: var(--spacing-xs) 0;
-  border-bottom: 1px solid var(--hairline-soft);
+  border-bottom: 1px solid var(--hairline);
 }
 </style>

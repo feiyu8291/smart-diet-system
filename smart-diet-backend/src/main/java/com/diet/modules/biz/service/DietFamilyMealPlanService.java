@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.diet.modules.biz.mapper.*;
 import com.diet.modules.biz.model.entity.*;
+import com.diet.modules.biz.model.vo.DietDayMealDetailVO;
+import com.diet.modules.biz.model.vo.DietMealDetailVO;
+import com.diet.modules.biz.model.vo.DietGroceryVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -582,6 +585,64 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         vo.setGroceries(groceryDetails);
 
         return vo;
+    }
+
+    /**
+     * 获取全天膳食详情并合并采购清单
+     */
+    public DietDayMealDetailVO getDayMealDetail(Long groupId, LocalDate date) {
+        DietMealDetailVO breakfast = getMealDetail(groupId, date, 1);
+        DietMealDetailVO lunch = getMealDetail(groupId, date, 2);
+        DietMealDetailVO dinner = getMealDetail(groupId, date, 3);
+
+        DietDayMealDetailVO vo = new DietDayMealDetailVO();
+        boolean hasMeal = (breakfast != null && Boolean.TRUE.equals(breakfast.getHasMeal()))
+                || (lunch != null && Boolean.TRUE.equals(lunch.getHasMeal()))
+                || (dinner != null && Boolean.TRUE.equals(dinner.getHasMeal()));
+
+        vo.setHasMeal(hasMeal);
+        vo.setBreakfast(breakfast);
+        vo.setLunch(lunch);
+        vo.setDinner(dinner);
+
+        List<DietGroceryVO> bGroceries = breakfast != null ? breakfast.getGroceries() : null;
+        List<DietGroceryVO> lGroceries = lunch != null ? lunch.getGroceries() : null;
+        List<DietGroceryVO> dGroceries = dinner != null ? dinner.getGroceries() : null;
+
+        vo.setDailyGroceries(mergeGroceries(bGroceries, lGroceries, dGroceries));
+        return vo;
+    }
+
+    /**
+     * 合并多餐的食材采购清单
+     */
+    @SafeVarargs
+    private final List<DietGroceryVO> mergeGroceries(List<DietGroceryVO>... groceryLists) {
+        Map<Long, DietGroceryVO> mergedMap = new LinkedHashMap<>();
+        for (List<DietGroceryVO> list : groceryLists) {
+            if (list == null) {
+                continue;
+            }
+            for (DietGroceryVO grocery : list) {
+                if (grocery.getIngredientId() == null) {
+                    continue;
+                }
+                DietGroceryVO existing = mergedMap.get(grocery.getIngredientId());
+                if (existing == null) {
+                    DietGroceryVO copy = new DietGroceryVO();
+                    copy.setIngredientId(grocery.getIngredientId());
+                    copy.setIngredientName(grocery.getIngredientName());
+                    copy.setMeasureUnit(grocery.getMeasureUnit());
+                    copy.setCondimentFlag(grocery.getCondimentFlag());
+                    copy.setUseAmount(grocery.getUseAmount() != null ? grocery.getUseAmount() : BigDecimal.ZERO);
+                    mergedMap.put(grocery.getIngredientId(), copy);
+                } else {
+                    BigDecimal amountToAdd = grocery.getUseAmount() != null ? grocery.getUseAmount() : BigDecimal.ZERO;
+                    existing.setUseAmount(existing.getUseAmount().add(amountToAdd));
+                }
+            }
+        }
+        return new ArrayList<>(mergedMap.values());
     }
 
     /**

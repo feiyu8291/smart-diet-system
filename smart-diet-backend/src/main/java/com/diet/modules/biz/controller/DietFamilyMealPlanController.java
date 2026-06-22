@@ -6,6 +6,7 @@ import com.diet.modules.biz.model.entity.DietDish;
 import com.diet.modules.biz.model.entity.DietFamilyMealPlan;
 import com.diet.modules.biz.model.po.DietMealDetailQueryPO;
 import com.diet.modules.biz.model.po.DietMealRecommendQueryPO;
+import com.diet.modules.biz.model.vo.DietDayMealDetailVO;
 import com.diet.modules.biz.model.vo.DietMealDetailVO;
 import com.diet.modules.biz.service.DietFamilyMealPlanService;
 import com.diet.modules.common.entity.Result;
@@ -73,6 +74,14 @@ public class DietFamilyMealPlanController {
     public Result<DietMealDetailVO> getMealDetail(DietMealDetailQueryPO po) {
         LocalDate date = LocalDate.parse(po.getTargetDate());
         DietMealDetailVO detail = familyMealPlanService.getMealDetail(po.getGroupId(), date, po.getMealPeriod());
+        return Result.success(detail);
+    }
+
+    @Operation(summary = "获取联合配餐全天详情")
+    @GetMapping("/day-detail")
+    public Result<DietDayMealDetailVO> getDayMealDetail(DietMealDetailQueryPO po) {
+        LocalDate date = LocalDate.parse(po.getTargetDate());
+        DietDayMealDetailVO detail = familyMealPlanService.getDayMealDetail(po.getGroupId(), date);
         return Result.success(detail);
     }
 

@@ -168,10 +168,9 @@ const handleLogin = async () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #ffffff;
+  background-color: var(--canvas);
   position: relative;
   overflow: hidden;
-  font-family: 'figmaSans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 /* 点阵背景 */
@@ -181,21 +180,20 @@ const handleLogin = async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-image: radial-gradient(#000000 1.5px, transparent 1.5px);
+  background-image: radial-gradient(rgba(247, 248, 248, 0.06) 1px, transparent 1px);
   background-size: 24px 24px;
-  opacity: 0.08;
   z-index: 1;
 }
 
-/* 粗边框 Neo-Brutalism 卡片 */
+/* Linear 风格卡片 */
 .login-card {
   width: 100%;
-  max-width: 440px;
+  max-width: 420px;
   padding: 40px;
-  background-color: #f4ecd6; /* block-cream: 纸张黄 */
-  border: 3px solid #000000;
-  border-radius: 24px; /* rounded-lg */
-  box-shadow: 8px 8px 0px #000000; /* 纯黑重投影 */
+  background-color: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-lg);
+  box-shadow: 0px 8px 30px rgba(0, 0, 0, 0.5);
   z-index: 2;
   position: relative;
 }
@@ -206,29 +204,28 @@ const handleLogin = async () => {
 }
 
 .system-title {
-  font-size: 36px;
-  font-weight: 900;
-  letter-spacing: -1.5px;
-  color: #000000;
-  margin: 0 0 8px 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -1.0px;
+  color: var(--ink);
+  margin: 0 0 6px 0;
   text-transform: uppercase;
 }
 
 .system-subtitle {
-  font-size: 14px;
-  font-weight: 500;
-  color: #000000;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-subtle);
   margin: 0;
-  letter-spacing: 0.5px;
 }
 
-/* Pill 风格的选项卡 */
+/* 选项卡 */
 .tabs-container {
   display: flex;
-  background-color: #ffffff;
-  border: 2px solid #000000;
-  border-radius: 50px; /* rounded-pill */
-  padding: 4px;
+  background-color: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-md);
+  padding: 3px;
   margin-bottom: 24px;
 }
 
@@ -236,18 +233,19 @@ const handleLogin = async () => {
   flex: 1;
   border: none;
   background: transparent;
-  padding: 10px 16px;
-  font-size: 14px;
-  font-weight: 600;
-  border-radius: 50px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--rounded-sm);
   cursor: pointer;
-  color: #000000;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--ink-subtle);
+  transition: all 0.15s ease;
 }
 
 .tab-btn.active {
-  background-color: #000000;
-  color: #ffffff;
+  background-color: var(--surface-2);
+  color: var(--ink);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 /* 表单组件 */
@@ -266,63 +264,58 @@ const handleLogin = async () => {
 }
 
 .form-group label {
-  font-size: 13px;
-  font-weight: 700;
-  color: #000000;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-subtle);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-/* 粗线输入框 */
+/* 输入框 */
 .brutalist-input {
   width: 100%;
   box-sizing: border-box;
-  padding: 12px 16px;
-  border: 2px solid #000000;
-  border-radius: 8px; /* rounded-md */
-  background-color: #ffffff;
-  font-size: 15px;
-  font-weight: 500;
-  color: #000000;
+  padding: 10px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-md);
+  background-color: var(--canvas);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ink);
   outline: none;
-  transition: all 0.1s;
+  transition: all 0.15s ease;
 }
 
 .brutalist-input:focus {
-  background-color: #ffffff;
-  box-shadow: 3px 3px 0px #000000;
-  transform: translate(-2px, -2px);
+  border-color: var(--hairline-strong);
+  box-shadow: 0 0 0 2px rgba(94, 105, 210, 0.4);
 }
 
-/* 黑色 Pill 按钮 */
+/* 按钮 */
 .brutalist-btn-primary {
   width: 100%;
-  padding: 14px;
-  background-color: #000000;
-  color: #ffffff;
-  border: 2px solid #000000;
-  border-radius: 50px; /* rounded-pill */
-  font-size: 16px;
-  font-weight: 700;
+  padding: 12px;
+  background-color: var(--primary);
+  color: var(--on-primary);
+  border: none;
+  border-radius: var(--rounded-md);
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
-  box-shadow: 0 4px 0px rgba(0, 0, 0, 0);
+  transition: all 0.15s ease;
 }
 
 .brutalist-btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 0px #000000;
+  background-color: var(--primary-hover);
 }
 
 .brutalist-btn-primary:active {
-  transform: translateY(0);
-  box-shadow: 0 0px 0px rgba(0, 0, 0, 0);
+  background-color: var(--primary-focus);
 }
 
 .brutalist-btn-primary:disabled {
-  background-color: #555555;
+  background-color: var(--ink-tertiary);
+  color: var(--ink-subtle);
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
 </style>

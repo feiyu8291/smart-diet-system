@@ -83,7 +83,7 @@
           <!-- 自制 SVG 折线图，契合 Figma 编辑器极简黑白像素感，避免引入臃肿第三方库 -->
           <svg class="svg-chart" viewBox="0 0 500 240">
             <!-- 趋势填充区域 -->
-            <polygon :points="chartPolygonPoints" fill="rgba(255,255,255,0.4)"/>
+            <polygon :points="chartPolygonPoints" fill="rgba(94, 106, 210, 0.1)"/>
 
             <!-- 折线 -->
             <polyline :points="chartPolylinePoints" fill="none" stroke="var(--primary)" stroke-width="3"/>
@@ -103,12 +103,12 @@
             </g>
 
             <!-- 底部时间轴辅助线 -->
-            <line x1="20" y1="210" x2="480" y2="210" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
+            <line x1="20" y1="210" x2="480" y2="210" stroke="var(--hairline)" stroke-width="1"/>
           </svg>
         </div>
 
         <div v-else class="empty-chart-box">
-          <p class="body-sm" style="color: #666666">暂无历史体重数据，请在左侧录入今日体重开启第一次打卡！</p>
+          <p class="body-sm" style="color: var(--ink-subtle)">暂无历史体重数据，请在左侧录入今日体重开启第一次打卡！</p>
         </div>
       </div>
     </div>
@@ -116,11 +116,12 @@
 </template>
 
 <script setup lang="ts">
-import {computed, inject, onMounted, ref} from 'vue'
+import {computed, inject, onMounted, ref, unref} from 'vue'
 import {ElMessage} from 'element-plus'
 import request from '../utils/request'
 
-const groupId = inject<number>('groupId', 1)
+const activeGroupIdRef = inject<any>('groupId')
+const groupId = unref(activeGroupIdRef) || 1
 
 const members = ref<any[]>([])
 const selectedProfileId = ref<number | null>(null)
@@ -351,7 +352,8 @@ onMounted(() => {
 
 .chart-container {
   flex-grow: 1;
-  background-color: rgba(255, 255, 255, 0.45);
+  background-color: var(--canvas);
+  border: 1px solid var(--hairline);
   border-radius: var(--rounded-md);
   padding: var(--spacing-md);
   display: flex;
@@ -375,7 +377,7 @@ onMounted(() => {
 .chart-text-date {
   font-family: var(--font-sans);
   font-size: 10px;
-  fill: #666666;
+  fill: var(--ink-subtle);
 }
 
 .empty-chart-box {
@@ -383,7 +385,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px dashed rgba(0, 0, 0, 0.1);
+  border: 1px dashed var(--hairline);
   border-radius: var(--rounded-md);
   margin-top: var(--spacing-md);
 }

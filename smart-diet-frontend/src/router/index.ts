@@ -18,22 +18,52 @@ const routes = [
         meta: {title: '计划进度 - 智能膳食系统'}
     },
     {
+        path: '/m/dashboard',
+        name: 'MobileDashboard',
+        component: () => import('../views/mobile/MobileDashboard.vue'),
+        meta: {title: '计划进度 (移动版) - 智能膳食系统'}
+    },
+    {
         path: '/meal-planner',
         name: 'MealPlanner',
         component: () => import('../views/FamilyMealPlanner.vue'),
         meta: {title: '家庭配餐 - 智能膳食系统'}
     },
     {
-        path: '/family',
-        name: 'Family',
+        path: '/profile/personal',
+        name: 'PersonalProfile',
+        component: () => import('../views/PersonalProfile.vue'),
+        meta: {title: '个人档案 - 智能膳食系统'}
+    },
+    {
+        path: '/profile/family',
+        name: 'FamilyProfile',
         component: () => import('../views/FamilyManagement.vue'),
-        meta: {title: '家庭成员 - 智能膳食系统'}
+        meta: {title: '家庭档案 - 智能膳食系统'}
     },
     {
         path: '/dishes',
         name: 'Dishes',
         component: () => import('../views/DishLibrary.vue'),
         meta: {title: '菜谱广场 - 智能膳食系统'}
+    },
+    {
+        path: '/dish-manage',
+        name: 'DishManage',
+        component: () => import('../views/DishManage.vue'),
+        meta: {title: '菜谱管理 - 智能膳食系统'}
+    },
+    {
+        path: '/ingredients',
+        name: 'IngredientManage',
+        component: () => import('../views/IngredientManage.vue'),
+        meta: {title: '原材料管理 - 智能膳食系统'}
+    },
+    {
+        path: '/cooking-steps',
+        name: 'CookingStepManage',
+        component: () => import('../views/CookingStepManage.vue'),
+        meta: {title: '烹饪步骤 - 智能膳食系统'}
     },
     {
         path: '/weight',

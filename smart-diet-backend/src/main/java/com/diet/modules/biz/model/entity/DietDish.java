@@ -21,6 +21,7 @@ public class DietDish {
     private BigDecimal fat;
     private BigDecimal carbs;
     private Long coverImageId;
+    private String imageIds;
 
     // 审计字段
     private Integer delFlag;

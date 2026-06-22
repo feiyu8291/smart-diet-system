@@ -85,7 +85,6 @@ public class SysDataDictionaryController {
         return Result.success();
     }
 
-    @RequiresPermission
     @Operation(summary = "根据类型查询字典列表")
     @GetMapping("/list")
     public Result<List<SysDataDictionary>> listByType(@Parameter(description = "数据类型", required = true) @RequestParam String dataType) {

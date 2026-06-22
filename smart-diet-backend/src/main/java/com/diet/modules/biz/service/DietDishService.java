@@ -20,6 +20,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -261,5 +263,184 @@ public class DietDishService extends ServiceImpl<DietDishMapper, DietDish> {
             }
             return true;
         }
+    }
+
+    /**
+     * 保存或更新菜谱，包含其配料与步骤关联
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean saveDish(com.diet.modules.biz.model.dto.DietDishSaveDTO dto) {
+        if (dto == null || dto.getDishName() == null || dto.getDishName().trim().isEmpty()) {
+            return false;
+        }
+
+        // 1. 组装并保存菜品主表
+        DietDish dish = new DietDish();
+        if (dto.getDishId() != null) {
+            dish = dishMapper.selectById(dto.getDishId());
+            if (dish == null) {
+                throw new RuntimeException("修改的菜品不存在！");
+            }
+        } else {
+            dish.setDelFlag(0);
+            dish.setCreateTime(LocalDateTime.now());
+        }
+
+        dish.setDishName(dto.getDishName());
+        dish.setCuisineType(dto.getCuisineType());
+        dish.setDietMode(dto.getDietMode() != null ? dto.getDietMode() : 0);
+        dish.setImageIds(dto.getImageIds());
+
+        // 提取 imageIds 中的第一张图片 ID 作为 coverImageId，以向下兼容
+        if (dto.getImageIds() != null && !dto.getImageIds().trim().isEmpty()) {
+            String[] ids = dto.getImageIds().split(",");
+            if (ids.length > 0 && !ids[0].trim().isEmpty()) {
+                try {
+                    dish.setCoverImageId(Long.parseLong(ids[0].trim()));
+                } catch (NumberFormatException e) {
+                    dish.setCoverImageId(dto.getCoverImageId());
+                }
+            } else {
+                dish.setCoverImageId(dto.getCoverImageId());
+            }
+        } else {
+            dish.setCoverImageId(dto.getCoverImageId());
+        }
+
+        dish.setUpdateTime(LocalDateTime.now());
+
+        // 2. 智能核算热量与三大营养素
+        // 如果传入了大于0的具体值，优先使用传入值；否则从配料中重算每100克成品菜的营养素
+        boolean needsCalc = (dto.getCalories() == null || dto.getCalories().doubleValue() <= 0);
+
+        if (!needsCalc) {
+            dish.setCalories(dto.getCalories());
+            dish.setProtein(dto.getProtein() != null ? dto.getProtein() : BigDecimal.ZERO);
+            dish.setFat(dto.getFat() != null ? dto.getFat() : BigDecimal.ZERO);
+            dish.setCarbs(dto.getCarbs() != null ? dto.getCarbs() : BigDecimal.ZERO);
+        } else {
+            // 根据配料表进行计算
+            if (dto.getIngredients() == null || dto.getIngredients().isEmpty()) {
+                dish.setCalories(BigDecimal.ZERO);
+                dish.setProtein(BigDecimal.ZERO);
+                dish.setFat(BigDecimal.ZERO);
+                dish.setCarbs(BigDecimal.ZERO);
+            } else {
+                double totalWeight = 0;
+                double totalCals = 0;
+                double totalProt = 0;
+                double totalFat = 0;
+                double totalCarbs = 0;
+
+                for (com.diet.modules.biz.model.dto.DietDishIngredientSaveDTO ingDto : dto.getIngredients()) {
+                    DietIngredient ing = ingredientMapper.selectById(ingDto.getIngredientId());
+                    if (ing != null && ing.getDelFlag() == 0 && ingDto.getUseAmount() != null) {
+                        double weight = ingDto.getUseAmount().doubleValue();
+                        totalWeight += weight;
+                        totalCals += (ing.getCalories().doubleValue() * weight) / 100.0;
+                        totalProt += (ing.getProtein().doubleValue() * weight) / 100.0;
+                        totalFat += (ing.getFat().doubleValue() * weight) / 100.0;
+                        totalCarbs += (ing.getCarbs().doubleValue() * weight) / 100.0;
+                    }
+                }
+
+                if (totalWeight > 0) {
+                    // 折算为每 100 克成品的营养素
+                    dish.setCalories(BigDecimal.valueOf((totalCals / totalWeight) * 100.0).setScale(2, RoundingMode.HALF_UP));
+                    dish.setProtein(BigDecimal.valueOf((totalProt / totalWeight) * 100.0).setScale(2, RoundingMode.HALF_UP));
+                    dish.setFat(BigDecimal.valueOf((totalFat / totalWeight) * 100.0).setScale(2, RoundingMode.HALF_UP));
+                    dish.setCarbs(BigDecimal.valueOf((totalCarbs / totalWeight) * 100.0).setScale(2, RoundingMode.HALF_UP));
+                } else {
+                    dish.setCalories(BigDecimal.ZERO);
+                    dish.setProtein(BigDecimal.ZERO);
+                    dish.setFat(BigDecimal.ZERO);
+                    dish.setCarbs(BigDecimal.ZERO);
+                }
+            }
+        }
+
+        // 保存或修改主表
+        if (dto.getDishId() != null) {
+            dishMapper.updateById(dish);
+        } else {
+            dishMapper.insert(dish);
+        }
+        Long dishId = dish.getDishId();
+
+        // 3. 清理已有的配料与步骤关联
+        LambdaQueryWrapper<DietDishIngredient> ingDelete = new LambdaQueryWrapper<>();
+        ingDelete.eq(DietDishIngredient::getDishId, dishId);
+        dishIngredientMapper.delete(ingDelete);
+
+        LambdaQueryWrapper<DietDishStepRelation> stepDelete = new LambdaQueryWrapper<>();
+        stepDelete.eq(DietDishStepRelation::getDishId, dishId);
+        dishStepRelationMapper.delete(stepDelete);
+
+        // 4. 插入全新的配料关系
+        if (dto.getIngredients() != null) {
+            for (com.diet.modules.biz.model.dto.DietDishIngredientSaveDTO ingDto : dto.getIngredients()) {
+                DietDishIngredient rel = new DietDishIngredient();
+                rel.setDishId(dishId);
+                rel.setIngredientId(ingDto.getIngredientId());
+                rel.setUseAmount(ingDto.getUseAmount());
+                rel.setMainMaterialFlag(ingDto.getMainMaterialFlag() != null ? ingDto.getMainMaterialFlag() : 1);
+                rel.setDelFlag(0);
+                rel.setCreateTime(LocalDateTime.now());
+                rel.setUpdateTime(LocalDateTime.now());
+                dishIngredientMapper.insert(rel);
+            }
+        }
+
+        // 5. 插入全新的步骤关系
+        if (dto.getSteps() != null) {
+            for (com.diet.modules.biz.model.dto.DietDishStepSaveDTO stepDto : dto.getSteps()) {
+                DietDishStepRelation rel = new DietDishStepRelation();
+                rel.setDishId(dishId);
+                rel.setStepPoolId(stepDto.getStepPoolId() != null ? stepDto.getStepPoolId() : 0L);
+                rel.setStepNum(stepDto.getStepNum());
+                rel.setCustomDetail(stepDto.getCustomDetail());
+                rel.setDelFlag(0);
+                rel.setCreateTime(LocalDateTime.now());
+                rel.setUpdateTime(LocalDateTime.now());
+                dishStepRelationMapper.insert(rel);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * 软删除菜谱及其相关的关联关系
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean deleteDish(Long dishId) {
+        DietDish dish = dishMapper.selectById(dishId);
+        if (dish != null) {
+            dish.setDelFlag(1); // 软删除
+            dish.setUpdateTime(LocalDateTime.now());
+            int updated = dishMapper.updateById(dish);
+            if (updated > 0) {
+                // 同步软删除其食材与步骤配方关联
+                LambdaQueryWrapper<DietDishIngredient> ingQuery = new LambdaQueryWrapper<>();
+                ingQuery.eq(DietDishIngredient::getDishId, dishId);
+                List<DietDishIngredient> ingredients = dishIngredientMapper.selectList(ingQuery);
+                for (DietDishIngredient ing : ingredients) {
+                    ing.setDelFlag(1);
+                    ing.setUpdateTime(LocalDateTime.now());
+                    dishIngredientMapper.updateById(ing);
+                }
+
+                LambdaQueryWrapper<DietDishStepRelation> stepQuery = new LambdaQueryWrapper<>();
+                stepQuery.eq(DietDishStepRelation::getDishId, dishId);
+                List<DietDishStepRelation> steps = dishStepRelationMapper.selectList(stepQuery);
+                for (DietDishStepRelation step : steps) {
+                    step.setDelFlag(1);
+                    step.setUpdateTime(LocalDateTime.now());
+                    dishStepRelationMapper.updateById(step);
+                }
+                return true;
+            }
+        }
+        return false;
     }
 }

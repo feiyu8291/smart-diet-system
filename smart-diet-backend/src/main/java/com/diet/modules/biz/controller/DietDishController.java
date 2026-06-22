@@ -1,5 +1,6 @@
 package com.diet.modules.biz.controller;
 
+import com.diet.modules.biz.model.dto.DietDishSaveDTO;
 import com.diet.modules.biz.model.dto.DietDislikeDTO;
 import com.diet.modules.biz.model.dto.DietSkilledDTO;
 import com.diet.modules.biz.model.dto.DietWishDTO;
@@ -62,6 +63,20 @@ public class DietDishController {
     @PostMapping("/skilled")
     public Result<Boolean> manageSkilled(@RequestBody DietSkilledDTO dto) {
         Boolean success = dishService.manageSkilled(dto);
+        return Result.success(success);
+    }
+
+    @Operation(summary = "保存/修改菜谱")
+    @PostMapping("/save")
+    public Result<Boolean> saveDish(@RequestBody DietDishSaveDTO dto) {
+        Boolean success = dishService.saveDish(dto);
+        return Result.success(success);
+    }
+
+    @Operation(summary = "删除菜谱")
+    @DeleteMapping("/delete/{dishId}")
+    public Result<Boolean> deleteDish(@PathVariable Long dishId) {
+        Boolean success = dishService.deleteDish(dishId);
         return Result.success(success);
     }
 }

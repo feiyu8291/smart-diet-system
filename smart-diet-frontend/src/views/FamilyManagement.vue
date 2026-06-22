@@ -1,78 +1,110 @@
 <template>
   <div class="content-container section-gap">
-    <div class="header-section" style="display: flex; justify-content: space-between; align-items: flex-end">
-      <div>
-        <span class="eyebrow">FAMILY HEALTH ARCHIVE</span>
-        <h1 class="display-lg">家庭健康档案</h1>
-      </div>
-      <button class="btn-primary" @click="handleOpenCreateModal">
-        + 新增就餐人
-      </button>
-    </div>
+    <div class="family-layout">
+      <!-- 左侧：家庭分组管理面板 -->
+      <div class="group-panel hairline-border">
+        <div class="panel-header">
+          <span class="eyebrow">FAMILY GROUPS</span>
+          <h2 class="panel-title">我的家庭组</h2>
+        </div>
+        <button class="btn-primary add-group-btn" @click="groupModalVisible = true">
+          + 新增家庭组
+        </button>
 
-    <!-- 1. 成员大便签纸卡片列表 -->
-    <div class="members-grid">
-      <div
-          v-for="(member, idx) in members"
-          :key="member.profileId"
-          :class="['color-block', 'member-card', getMemberCardColor(idx)]"
-      >
-        <div class="member-header">
-          <div>
-            <h3 class="card-title">{{ member.memberName }}</h3>
-            <!-- 关系与在线/离线角色标识 -->
-            <span class="caption tag-relation">
-              {{ member.memberRelation }} | {{ member.userId ? '在线用户' : '离线成员' }}
-            </span>
+        <div class="group-list">
+          <div
+              v-for="g in groups"
+              :key="g.groupId"
+              :class="['group-item', { active: activeGroupIdRef.value === g.groupId }]"
+              @click="changeGroupId(g.groupId)"
+          >
+            <span class="group-name">🏠 {{ g.groupName }}</span>
+            <button class="btn-delete-group" @click.stop="handleDeleteGroup(g.groupId)">✕</button>
           </div>
-          <div class="member-actions">
-            <!-- 圆形编辑和删除按钮 -->
-            <button class="btn-icon-clear" @click="handleEdit(member)">
-              <el-icon>
-                <Edit/>
-              </el-icon>
-            </button>
-            <button class="btn-icon-clear" @click="handleDelete(member.profileId)">
-              <el-icon>
-                <Delete/>
-              </el-icon>
-            </button>
+          <div v-if="groups.length === 0" class="empty-tip">
+            暂无家庭组，请先新增。
           </div>
         </div>
+      </div>
 
-        <!-- 测评核心指标数据面板 -->
-        <div class="metrics-grid">
-          <div class="metric-item">
-            <span class="caption">BMI 指标</span>
-            <div class="metric-value">{{ calculateBMI(member) }}</div>
+      <!-- 右侧：成员档案列表面板 -->
+      <div class="members-panel">
+        <div class="header-section">
+          <div>
+            <span class="eyebrow">FAMILY HEALTH ARCHIVE</span>
+            <h1 class="display-lg">家庭成员档案</h1>
           </div>
-          <div class="metric-item">
-            <span class="caption">BMR 基础代谢</span>
-            <div class="metric-value font-mono">{{ member.bmrCalories || 0 }} <span class="unit">kcal</span></div>
-          </div>
-          <div class="metric-item">
-            <span class="caption">TDEE 日消耗</span>
-            <div class="metric-value font-mono">{{ member.tdeeCalories || 0 }} <span class="unit">kcal</span></div>
-          </div>
-          <div class="metric-item">
-            <span class="caption">单日热量目标</span>
-            <div class="metric-value font-mono" style="color: var(--primary)">
-              {{ member.dailyTargetCalories || 0 }} <span class="unit">kcal</span>
+          <button class="btn-primary" @click="handleOpenCreateModal">
+            + 新增就餐人
+          </button>
+        </div>
+
+        <!-- 成员大便签纸卡片列表 -->
+        <div class="members-grid">
+          <div
+              v-for="(member, idx) in members"
+              :key="member.profileId"
+              :class="['color-block', 'member-card', getMemberCardColor(idx)]"
+          >
+            <div class="member-header">
+              <div>
+                <h3 class="card-title">{{ member.memberName }}</h3>
+                <span class="caption tag-relation">
+                  {{ member.memberRelation }} | {{ member.userId ? '在线用户' : '离线成员' }}
+                </span>
+              </div>
+              <div class="member-actions">
+                <button class="btn-icon-clear" @click="handleEdit(member)">
+                  <el-icon>
+                    <Edit/>
+                  </el-icon>
+                </button>
+                <button class="btn-icon-clear" @click="handleDelete(member.profileId)">
+                  <el-icon>
+                    <Delete/>
+                  </el-icon>
+                </button>
+              </div>
+            </div>
+
+            <!-- 测评核心指标数据面板 -->
+            <div class="metrics-grid">
+              <div class="metric-item">
+                <span class="caption">BMI 指标</span>
+                <div class="metric-value">{{ calculateBMI(member) }}</div>
+              </div>
+              <div class="metric-item">
+                <span class="caption">BMR 基础代谢</span>
+                <div class="metric-value font-mono">{{ member.bmrCalories || 0 }} <span class="unit">kcal</span></div>
+              </div>
+              <div class="metric-item">
+                <span class="caption">TDEE 日消耗</span>
+                <div class="metric-value font-mono">{{ member.tdeeCalories || 0 }} <span class="unit">kcal</span></div>
+              </div>
+              <div class="metric-item">
+                <span class="caption">单日热量目标</span>
+                <div class="metric-value font-mono" style="color: var(--primary)">
+                  {{ member.dailyTargetCalories || 0 }} <span class="unit">kcal</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 身体测量基本参数 -->
+            <div class="params-row body-sm">
+              <span>身高: <strong>{{ member.memberHeight }} cm</strong></span>
+              <span>体重: <strong>{{ member.memberWeight }} kg</strong></span>
+              <span>年龄: <strong>{{ member.memberAge }} 岁</strong></span>
+              <span>目标: <strong>{{ member.targetWeight }} kg</strong></span>
             </div>
           </div>
         </div>
-
-        <!-- 身体测量基本参数 -->
-        <div class="params-row body-sm">
-          <span>身高: <strong>{{ member.memberHeight }} cm</strong></span>
-          <span>体重: <strong>{{ member.memberWeight }} kg</strong></span>
-          <span>年龄: <strong>{{ member.memberAge }} 岁</strong></span>
-          <span>目标: <strong>{{ member.targetWeight }} kg</strong></span>
+        <div v-if="members.length === 0" class="empty-tip-members color-block">
+          当前家庭组下暂无就餐人档案，点击右上角“新增就餐人”开始录入。
         </div>
       </div>
     </div>
 
-    <!-- 2. 档案编辑/新增测评弹窗 (抽屉/Dialog，圆角与Monochrome输入框) -->
+    <!-- 档案编辑/新增测评弹窗 -->
     <el-dialog
         v-model="modalVisible"
         :title="form.profileId ? '编辑健康档案测评' : '新增就餐成员测评'"
@@ -175,18 +207,43 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 新建家庭组 Dialog -->
+    <el-dialog
+        v-model="groupModalVisible"
+        title="新建家庭组"
+        width="400px"
+    >
+      <div class="member-form">
+        <div class="form-item">
+          <label class="caption">家庭组名称</label>
+          <input type="text" v-model="groupForm.groupName" class="input-text" placeholder="例如: 我的小家庭、老李的大家庭"/>
+        </div>
+      </div>
+      <template #footer>
+        <button class="btn-secondary" style="margin-right: 10px" @click="groupModalVisible = false">取消</button>
+        <button class="btn-primary" @click="handleSaveGroup">保存</button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import {inject, onMounted, ref} from 'vue'
+import {inject, onMounted, ref, unref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import request from '../utils/request'
 
-const groupId = inject<number>('groupId', 1)
+const activeGroupIdRef = inject<any>('groupId')
+const changeGroupId = inject<any>('changeGroupId')
+const cookUserId = inject<number>('cookUserId', 1)
+
+// 解包后的 groupId 值，每次组件重新挂载时自动重新 inject 读取最新值
+const groupId = unref(activeGroupIdRef) || 1
 
 const members = ref<any[]>([])
+const groups = ref<any[]>([])
 const modalVisible = ref(false)
+const groupModalVisible = ref(false)
 const bindStatus = ref(0) // 默认离线
 
 const defaultForm = {
@@ -205,6 +262,24 @@ const defaultForm = {
   dietSpeed: 0.50
 }
 const form = ref({...defaultForm})
+const groupForm = ref({
+  groupName: ''
+})
+
+const loadGroups = async () => {
+  try {
+    const list = await request.get(`/api/group/list?userId=${cookUserId}`)
+    groups.value = list
+    // 如果本地存储没有选中的 activeGroupId，或者当前选中的 group 不在列表里，默认选第一个
+    if (list.length > 0) {
+      const activeExists = list.some((g: any) => g.groupId === activeGroupIdRef.value)
+      if (!activeExists) {
+        changeGroupId(list[0].groupId)
+      }
+    }
+  } catch (e) {
+  }
+}
 
 const loadMembers = async () => {
   try {
@@ -214,7 +289,6 @@ const loadMembers = async () => {
 }
 
 const getMemberCardColor = (idx: number): string => {
-  // 按顺序循环使用 lime, lilac, cream, mint, pink, coral 六种大贴纸色
   const colors = ['color-block-lime', 'color-block-lilac', 'color-block-cream', 'color-block-mint', 'color-block-pink', 'color-block-coral']
   return colors[idx % colors.length]
 }
@@ -224,11 +298,8 @@ const calculateBMI = (member: any): string => {
   if (!member.memberWeight || !member.memberHeight) return '0.0'
   const heightM = member.memberHeight / 100.0
   const bmi = member.memberWeight / (heightM * heightM)
-
-  // 四舍五入保留一位小数
   const val = Math.round(bmi * 10) / 10
 
-  // 加上分类字样
   if (val < 18.5) return `${val} (偏瘦)`
   if (val >= 18.5 && val < 24.0) return `${val} (正常)`
   if (val >= 24.0 && val < 28.0) return `${val} (超重)`
@@ -236,7 +307,7 @@ const calculateBMI = (member: any): string => {
 }
 
 const handleOpenCreateModal = () => {
-  form.value = {...defaultForm}
+  form.value = {...defaultForm, groupId: groupId}
   bindStatus.value = 0
   modalVisible.value = true
 }
@@ -252,8 +323,6 @@ const handleSaveProfile = async () => {
     ElMessage.warning('请输入就餐人姓名或称呼！')
     return
   }
-
-  // 根据绑定状态决定 userId 值
   if (bindStatus.value === 0) {
     form.value.userId = null
   }
@@ -291,15 +360,172 @@ const handleDelete = (profileId: number) => {
   })
 }
 
+// 新增家庭组
+const handleSaveGroup = async () => {
+  if (!groupForm.value.groupName.trim()) {
+    ElMessage.warning('请输入家庭组名称！')
+    return
+  }
+  try {
+    const payload = {
+      groupName: groupForm.value.groupName.trim(),
+      creatorUserId: cookUserId
+    }
+    const res = await request.post('/api/group/save', payload)
+    if (res) {
+      ElMessage.success('新建家庭组成功！')
+      groupModalVisible.value = false
+      groupForm.value.groupName = ''
+      await loadGroups()
+    }
+  } catch (e) {
+  }
+}
+
+// 删除家庭组
+const handleDeleteGroup = (targetGroupId: number) => {
+  ElMessageBox.confirm(
+      '确认删除该家庭组？该操作将软删除该分组。',
+      '警告',
+      {
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+  ).then(async () => {
+    try {
+      const res = await request.delete(`/api/group/delete/${targetGroupId}`)
+      if (res) {
+        ElMessage.success('家庭组已删除！')
+        if (activeGroupIdRef.value === targetGroupId) {
+          localStorage.removeItem('activeGroupId')
+        }
+        await loadGroups()
+      }
+    } catch (e) {
+    }
+  }).catch(() => {
+  })
+}
+
 onMounted(() => {
+  loadGroups()
   loadMembers()
 })
 </script>
 
 <style scoped>
-.header-section {
+.family-layout {
+  display: flex;
+  gap: var(--spacing-lg);
   margin-top: var(--spacing-xl);
+}
+
+.group-panel {
+  width: 260px;
+  min-width: 260px;
+  background-color: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--rounded-lg);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  height: fit-content;
+}
+
+.panel-header {
+  margin-bottom: var(--spacing-sm);
+}
+
+.panel-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-top: var(--spacing-xxs);
+}
+
+.add-group-btn {
+  width: 100%;
+  margin-bottom: var(--spacing-md);
+  padding: 8px 14px;
+}
+
+.group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.group-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: var(--rounded-sm);
+  background-color: var(--surface-2);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.group-item:hover {
+  background-color: var(--surface-3);
+}
+
+.group-item.active {
+  background-color: var(--surface-3);
+  border-color: var(--primary);
+}
+
+.group-item.active .group-name {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.group-name {
+  font-size: 14px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-delete-group {
+  background: transparent;
+  border: none;
+  color: var(--ink-tertiary);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 4px;
+  line-height: 1;
+}
+
+.btn-delete-group:hover {
+  color: var(--primary);
+}
+
+.empty-tip {
+  font-size: 12px;
+  color: var(--ink-subtle);
+  text-align: center;
+  padding: var(--spacing-md) 0;
+}
+
+.members-panel {
+  flex-grow: 1;
+}
+
+.header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
   margin-bottom: var(--spacing-lg);
+}
+
+.empty-tip-members {
+  text-align: center;
+  padding: var(--spacing-xxl) !important;
+  color: var(--ink-subtle);
 }
 
 .members-grid {
@@ -323,12 +549,13 @@ onMounted(() => {
 
 .tag-relation {
   display: inline-block;
-  background-color: var(--primary);
-  color: var(--on-primary);
+  background-color: var(--surface-2);
+  border: 1px solid var(--hairline);
+  color: var(--primary-hover);
   padding: 2px 8px;
-  border-radius: var(--rounded-pill);
+  border-radius: var(--rounded-xs);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 500;
   margin-top: var(--spacing-xxs);
 }
 
@@ -338,12 +565,12 @@ onMounted(() => {
   cursor: pointer;
   padding: 6px;
   font-size: 18px;
-  color: var(--ink);
-  transition: opacity 0.1s ease;
+  color: var(--ink-subtle);
+  transition: color 0.15s ease;
 }
 
 .btn-icon-clear:hover {
-  opacity: 0.6;
+  color: var(--ink);
 }
 
 .metrics-grid {
@@ -376,8 +603,9 @@ onMounted(() => {
 .params-row {
   display: flex;
   justify-content: space-between;
-  border-top: 1px dashed rgba(0, 0, 0, 0.15);
+  border-top: 1px dashed var(--hairline);
   padding-top: var(--spacing-sm);
+  color: var(--ink-muted);
 }
 
 .member-form {
