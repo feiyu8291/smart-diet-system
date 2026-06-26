@@ -6,12 +6,12 @@ import cn.hutool.core.text.CharSequenceUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.diet.modules.common.config.RsaProperties;
 import com.diet.modules.common.constant.CacheKeyConstant;
 import com.diet.modules.common.exception.BusinessException;
-import com.diet.modules.common.config.RsaProperties;
-import com.diet.modules.common.util.RsaUtil;
 import com.diet.modules.common.util.PasswordUtil;
 import com.diet.modules.common.util.RedisUtil;
+import com.diet.modules.common.util.RsaUtil;
 import com.diet.modules.common.util.SecurityUtils;
 import com.diet.modules.system.mapper.SysUserMapper;
 import com.diet.modules.system.model.dto.ChangePasswordDTO;
@@ -404,6 +404,16 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
         return lambdaQuery()
                 .eq(SysUser::getUseStatus, 0)
                 .in(SysUser::getUserId, userIds)
+                .orderByAsc(SysUser::getRealName)
+                .list();
+    }
+
+    /**
+     * 获取系统中所有启用的系统用户
+     */
+    public List<SysUser> listAll() {
+        return lambdaQuery()
+                .eq(SysUser::getUseStatus, 0)
                 .orderByAsc(SysUser::getRealName)
                 .list();
     }

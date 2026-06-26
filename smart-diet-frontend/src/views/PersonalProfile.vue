@@ -1,14 +1,42 @@
 <template>
   <div class="content-container section-gap">
-    <div class="header-section">
-      <span class="eyebrow">PERSONAL HEALTH ARCHIVE</span>
-      <h1 class="display-lg">个人健康档案</h1>
+    <div class="header-section" style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; flex-wrap: wrap; gap: var(--spacing-sm);">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <el-button @click="$router.push('/profile/personal')" style="margin-right: 8px;">
+          ← 返回列表
+        </el-button>
+        <div>
+          <span class="eyebrow">MEMBER HEALTH ARCHIVE</span>
+          <h1 class="display-lg" style="margin-top: 4px; margin-bottom: 0;">成员健康评估详情</h1>
+        </div>
+      </div>
+      <!-- 成员检索与新建 -->
+      <div class="header-controls" style="display: flex; align-items: center; gap: 12px;">
+        <span class="caption" style="white-space: nowrap; font-weight: 600;">选择成员：</span>
+        <el-select
+            v-model="selectedProfileId"
+            filterable
+            placeholder="搜索/选择就餐人..."
+            style="width: 240px"
+            @change="onProfileChange"
+        >
+          <el-option
+              v-for="p in allProfiles"
+              :key="p.profileId"
+              :label="`${p.memberName} (${p.memberRelation})`"
+              :value="p.profileId"
+          />
+        </el-select>
+        <button class="btn-primary" @click="handleInitCreate">
+          + 新建成员档案
+        </button>
+      </div>
     </div>
 
     <!-- 骨架屏 / 加载状态 -->
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
-      <p class="body-sm text-muted">正在加载个人健康指标...</p>
+      <p class="body-sm text-muted">正在加载健康指标...</p>
     </div>
 
     <!-- 主容器 -->
@@ -22,7 +50,7 @@
               <span class="eyebrow">HEALTH REPORT</span>
               <h2 class="card-title">{{ profile.memberName }} 的健康报告</h2>
             </div>
-            <span class="tag-relation">本人 | 账号已绑定</span>
+            <span class="tag-relation">{{ profile.memberRelation }} | {{ profile.userId ? '在线用户' : '离线成员' }}</span>
           </div>
 
           <!-- 四大核心指标大字报 -->
@@ -60,7 +88,7 @@
             </div>
             <div class="summary-item">
               <span class="label">年龄</span>
-              <strong class="val">{{ profile.memberAge }} 岁</strong>
+              <strong class="val">{{ getAge(profile.memberBirthday) }} 岁</strong>
             </div>
             <div class="summary-item">
               <span class="label">当前身高</span>
@@ -79,9 +107,9 @@
 
         <!-- 暂无个人档案警告 -->
         <div v-else class="empty-profile-card color-block color-block-pink">
-          <h2 class="headline">未检测到您的个人档案</h2>
+          <h2 class="headline">未检测到该就餐人档案</h2>
           <p class="body-text text-muted" style="margin-bottom: 20px;">
-            您当前还没有在当前家庭组下录入您的个人健康档案。请点击右侧表单录入您的身高、体重等核心身体指标，以便系统为您进行科学的膳食摄入评估。
+            请在右侧录入该成员的身高、体重等核心身体指标，以便系统进行科学的膳食评估。
           </p>
         </div>
 
@@ -92,7 +120,7 @@
           <ul class="guide-list body-sm">
             <li><strong>合理热量赤字：</strong>推荐周减重 0.5kg（对应每日热量赤字约 550 kcal），这是最温和且不易反弹的减脂速度。</li>
             <li><strong>最低热量防线：</strong>系统已自动开启安全保护机制，您的每日目标摄入量绝不低于 BMR 的 90% 或 1000 kcal，以此避免基础代谢受损。</li>
-            <li><strong>精准运动加成：</strong>如果您的运动量有所增加，建议在右侧表单调整“日常活动强度”，系统将自动为您重算 TDEE 并更新配餐比例。</li>
+            <li><strong>精准运动加成：</strong>如果您的运动量有所增加，建议在右侧表单调整“日常活动强度”，系统将自动更新计算。</li>
           </ul>
         </div>
       </div>
@@ -100,25 +128,57 @@
       <!-- 右半部分：档案信息配置与修改 -->
       <div class="edit-form-panel color-block">
         <div class="panel-header">
-          <span class="eyebrow">UPDATE ARCHIVE</span>
-          <h2 class="panel-title">修改身体参数</h2>
-          <p class="caption-desc">请保持数据的真实性，以便智能配餐算法准确计算每日热量比例。</p>
+          <span class="eyebrow">{{ form.profileId ? 'UPDATE ARCHIVE' : 'CREATE ARCHIVE' }}</span>
+          <h2 class="panel-title">{{ form.profileId ? '修改身体参数' : '录入新就餐人' }}</h2>
+          <p class="caption-desc">请录入正确的身体测量数据，以便算法为您计算每日热量比例。</p>
         </div>
 
         <div class="archive-edit-form">
-          <!-- 姓名与关系 -->
+          <!-- 归属家庭组与亲属关系 -->
           <div class="form-row-2">
             <div class="form-item">
-              <label class="caption">姓名/称呼</label>
-              <input type="text" v-model="form.memberName" class="input-text" placeholder="例如: 张大厨"/>
+              <label class="caption">归属家庭组</label>
+              <el-select v-model="form.groupId" placeholder="选择归属家庭组" style="width: 100%">
+                <el-option
+                    v-for="g in allGroups"
+                    :key="g.groupId"
+                    :label="g.groupName"
+                    :value="g.groupId"
+                />
+              </el-select>
             </div>
             <div class="form-item">
               <label class="caption">与做饭人关系</label>
-              <input type="text" value="本人 (主账号)" class="input-text disabled-input" disabled/>
+              <el-select v-model="form.memberRelation" placeholder="选择关系" style="width: 100%">
+                <el-option value="本人" label="本人"/>
+                <el-option value="配偶" label="配偶"/>
+                <el-option value="子女" label="子女"/>
+                <el-option value="父母" label="父母"/>
+                <el-option value="亲友" label="亲友"/>
+              </el-select>
             </div>
           </div>
 
-          <!-- 性别与年龄 -->
+          <!-- 姓名与身份证号 -->
+          <div class="form-row-2">
+            <div class="form-item">
+              <label class="caption">姓名/称呼</label>
+              <input type="text" v-model="form.memberName" class="input-text" placeholder="例如: 爸爸、张三"/>
+            </div>
+            <div class="form-item">
+              <label class="caption">身份证号码 (可选)</label>
+              <input
+                  type="text"
+                  v-model="form.idCardNum"
+                  class="input-text"
+                  placeholder="可自动识别生日和性别"
+                  maxlength="18"
+                  @input="handleIdCardInput"
+              />
+            </div>
+          </div>
+
+          <!-- 性别与出生日期 -->
           <div class="form-row-2">
             <div class="form-item">
               <label class="caption">成员性别</label>
@@ -128,8 +188,14 @@
               </el-select>
             </div>
             <div class="form-item">
-              <label class="caption">年龄 (周岁)</label>
-              <input type="number" v-model="form.memberAge" class="input-text" placeholder="输入年龄"/>
+              <label class="caption">出生日期</label>
+              <el-date-picker
+                  v-model="form.memberBirthday"
+                  type="date"
+                  placeholder="选择出生日期"
+                  value-format="YYYY-MM-DD"
+                  style="width: 100%"
+              />
             </div>
           </div>
 
@@ -141,7 +207,7 @@
             </div>
             <div class="form-item">
               <label class="caption">体重 (kg)</label>
-              <input type="number" v-model="form.memberWeight" class="input-text" step="0.1" placeholder="输入当前实际体重"/>
+              <input type="number" v-model="form.memberWeight" class="input-text" step="0.1" placeholder="输入当前体重"/>
             </div>
           </div>
 
@@ -149,11 +215,11 @@
           <div class="form-row-2">
             <div class="form-item">
               <label class="caption">目标体重 (kg)</label>
-              <input type="number" v-model="form.targetWeight" class="input-text" step="0.1" placeholder="输入期望减重目标"/>
+              <input type="number" v-model="form.targetWeight" class="input-text" step="0.1" placeholder="输入目标体重"/>
             </div>
             <div class="form-item">
               <label class="caption">日常活动强度</label>
-              <el-select v-model="form.activityLevel" placeholder="选择日常活动量" style="width: 100%">
+              <el-select v-model="form.activityLevel" placeholder="选择活动量" style="width: 100%">
                 <el-option :value="1" label="久坐（办公室工作、少运动）"/>
                 <el-option :value="2" label="轻度（日常零星散步或轻度活动）"/>
                 <el-option :value="3" label="中度（每周规律运动3-5次）"/>
@@ -165,7 +231,7 @@
           <!-- 减重速度选择 -->
           <div class="form-item">
             <label class="caption">周科学减重速度 (kg/周)</label>
-            <el-select v-model="form.dietSpeed" placeholder="选择每日减脂赤字速度" style="width: 100%">
+            <el-select v-model="form.dietSpeed" placeholder="选择减脂速度" style="width: 100%">
               <el-option :value="0.00" label="0.00 kg/周 (维持当前体重 / 纯保养食谱)"/>
               <el-option :value="0.25" label="0.25 kg/周 (温和减脂 - 每日赤字 275 kcal)"/>
               <el-option :value="0.50" label="0.50 kg/周 (推荐速度 - 每日赤字 550 kcal)"/>
@@ -188,13 +254,16 @@
 </template>
 
 <script setup lang="ts">
-import {computed, inject, onMounted, ref, unref} from 'vue'
+import {computed, onMounted, ref} from 'vue'
 import {ElMessage} from 'element-plus'
+import {useRoute} from 'vue-router'
 import request from '../utils/request'
 
-const activeGroupIdRef = inject<any>('groupId')
-const groupId = unref(activeGroupIdRef) || 1
-const cookUserId = inject<number>('cookUserId', 1)
+const route = useRoute()
+
+const allProfiles = ref<any[]>([])
+const selectedProfileId = ref<number | null>(null)
+const allGroups = ref<any[]>([])
 
 const loading = ref(true)
 const profile = ref<any>(null)
@@ -202,14 +271,15 @@ const profile = ref<any>(null)
 const defaultForm = {
   profileId: null as number | null,
   userId: null as number | null,
-  groupId: groupId,
-  groupRole: 1, // 1-做饭人/管理员
+  groupId: null as number | null,
+  groupRole: 2, // 2-普通就餐人
   memberName: '',
+  idCardNum: '',
   memberRelation: '本人',
   memberGender: 1,
   memberHeight: 170.0,
   memberWeight: 65.0,
-  memberAge: 30,
+  memberBirthday: '1995-01-01',
   activityLevel: 2,
   targetWeight: 60.0,
   dietSpeed: 0.50
@@ -242,44 +312,101 @@ const bmiClass = computed(() => {
   return 'bmi-obese'
 })
 
-// 读取个人健康档案信息
-const loadPersonalProfile = async () => {
+// 年龄计算
+const getAge = (birthdayStr: string) => {
+  if (!birthdayStr) return 0
+  const birthDate = new Date(birthdayStr)
+  if (isNaN(birthDate.getTime())) return 0
+  const today = new Date()
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const m = today.getMonth() - birthDate.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--
+  }
+  return age >= 0 ? age : 0
+}
+
+// 身份证号码输入识别提取生日与性别
+const handleIdCardInput = (e: any) => {
+  const val = e.target.value
+  const reg = /^[1-9]\d{5}(18|19|20)\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$/
+  if (val.length === 18 && reg.test(val)) {
+    const year = val.substring(6, 10)
+    const month = val.substring(10, 12)
+    const day = val.substring(12, 14)
+    form.value.memberBirthday = `${year}-${month}-${day}`
+
+    const genderDigit = Number(val.substring(16, 17))
+    form.value.memberGender = (genderDigit % 2 === 1) ? 1 : 2
+    ElMessage.success('已根据身份证号码自动识别提取生日与性别！')
+  }
+}
+
+// 加载所有家庭组
+const loadGroups = async () => {
+  try {
+    allGroups.value = await request.get('/api/group/list')
+  } catch (e) {
+    console.error('加载所有家庭组失败', e)
+  }
+}
+
+// 读取所有人的健康档案信息
+const loadAllProfiles = async () => {
   loading.value = true
   try {
-    const list: any[] = await request.get(`/api/profile/list?groupId=${groupId}`)
-    const currentUserId = Number(localStorage.getItem('userId')) || cookUserId
+    const list: any[] = await request.get('/api/profile/list')
+    allProfiles.value = list || []
 
-    // 优先匹配 userId 等于当前用户的档案，其次匹配 memberRelation === '本人'
-    const found = list.find((m: any) => m.userId === currentUserId) || list.find((m: any) => m.memberRelation === '本人')
-
-    if (found) {
+    if (list.length > 0) {
+      // 优先使用 URL 中传递的就餐人参数
+      const queryId = route.query.profileId ? Number(route.query.profileId) : null
+      const targetId = queryId || selectedProfileId.value
+      const found = list.find((m: any) => m.profileId === targetId) || list[0]
+      selectedProfileId.value = found.profileId
       profile.value = found
       form.value = {...found}
     } else {
-      profile.value = null
-      // 初始化空表单数据
-      form.value = {
-        ...defaultForm,
-        groupId: groupId,
-        userId: currentUserId,
-        memberName: localStorage.getItem('realName') || localStorage.getItem('username') || '本人'
-      }
+      handleInitCreate()
     }
   } catch (e) {
-    console.error('获取个人健康档案失败', e)
+    console.error('获取健康档案失败', e)
   } finally {
     loading.value = false
   }
 }
 
-// 保存个人档案并重算体测
+// 选择成员下拉改变事件
+const onProfileChange = (profileId: number) => {
+  const found = allProfiles.value.find((m: any) => m.profileId === profileId)
+  if (found) {
+    profile.value = found
+    form.value = {...found}
+  }
+}
+
+// 点击新建成员初始化
+const handleInitCreate = () => {
+  profile.value = null
+  form.value = {
+    ...defaultForm,
+    groupId: allGroups.value.length > 0 ? allGroups.value[0].groupId : null
+  }
+  selectedProfileId.value = null
+}
+
+// 保存档案并重算体测
 const handleSaveProfile = async () => {
+  if (!form.value.groupId) {
+    ElMessage.warning('请选择所属家庭组！')
+    return
+  }
   if (!form.value.memberName) {
     ElMessage.warning('请输入姓名或称呼！')
     return
   }
-  if (!form.value.memberAge || form.value.memberAge <= 0) {
-    ElMessage.warning('请输入合法的年龄！')
+  if (!form.value.memberBirthday) {
+    ElMessage.warning('出生日期不能为空！')
     return
   }
   if (!form.value.memberHeight || form.value.memberHeight <= 0) {
@@ -296,18 +423,23 @@ const handleSaveProfile = async () => {
   }
 
   try {
-    const res = await request.post('/api/profile/save', form.value)
+    const res: any = await request.post('/api/profile/save', form.value)
     if (res) {
       ElMessage.success('保存成功，个人健康体测已重新计算！')
-      await loadPersonalProfile()
+      // 如果是新增，保存后自动选中它
+      if (!form.value.profileId && res && res.profileId) {
+        selectedProfileId.value = res.profileId
+      }
+      await loadAllProfiles()
     }
   } catch (e) {
-    console.error('保存个人档案失败', e)
+    console.error('保存健康档案失败', e)
   }
 }
 
-onMounted(() => {
-  loadPersonalProfile()
+onMounted(async () => {
+  await loadGroups()
+  await loadAllProfiles()
 })
 </script>
 

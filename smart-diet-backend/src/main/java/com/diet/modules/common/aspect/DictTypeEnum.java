@@ -30,7 +30,10 @@ public enum DictTypeEnum {
     PAY_METHOD("支付方式", "pay_method", "微信/支付宝/银行转账等", Category.NORMAL),
     ORDER_STATUS("售后状态", "order_status", "1跟进中 2完结", Category.NORMAL),
     SYS_OPERATION_TYPE("操作日志类型", "sys_operation_type", "登录/领取/分配/跟进等", Category.NORMAL),
-    ORDER_AUDIT_STATUS("订单审核状态", "order_audit_status", "0待审核 1已通过 2已驳回", Category.NORMAL);
+    ORDER_AUDIT_STATUS("订单审核状态", "order_audit_status", "0待审核 1已通过 2已驳回", Category.NORMAL),
+    FIRE_POWER_TYPE("火候类型", "fire_power_type", "0非热处理 1小火/慢炖 2中火/清蒸 3大火/爆炒", Category.NORMAL),
+    CUISINE_TYPE("菜系类型", "cuisine_type", "常规菜系", Category.NORMAL),
+    DIET_MODE_TYPE("膳食模式", "diet_mode_type", "0正常饮食 1轻食减脂 2放纵餐", Category.NORMAL);
 
     private final String dictName;
     private final String dictType;

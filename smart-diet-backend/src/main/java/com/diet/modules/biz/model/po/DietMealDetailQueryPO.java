@@ -1,5 +1,6 @@
 package com.diet.modules.biz.model.po;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 /**
@@ -9,8 +10,12 @@ import lombok.Data;
  * @date 2026-06-20
  */
 @Data
+@Schema(description = "日配餐详情查询参数实体类")
 public class DietMealDetailQueryPO {
+    @Schema(description = "家庭组ID")
     private Long groupId;
+    @Schema(description = "targetDate")
     private String targetDate;
+    @Schema(description = "mealPeriod")
     private Integer mealPeriod;
 }

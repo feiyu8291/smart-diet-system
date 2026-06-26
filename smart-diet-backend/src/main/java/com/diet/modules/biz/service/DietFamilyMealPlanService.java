@@ -5,9 +5,9 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.diet.modules.biz.mapper.*;
 import com.diet.modules.biz.model.entity.*;
 import com.diet.modules.biz.model.vo.DietDayMealDetailVO;
-import com.diet.modules.biz.model.vo.DietMealDetailVO;
 import com.diet.modules.biz.model.vo.DietGroceryVO;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.diet.modules.biz.model.vo.DietMealDetailVO;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,44 +25,33 @@ import java.util.stream.Collectors;
  * @date 2026-06-20
  */
 @Service
+@RequiredArgsConstructor
 public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMapper, DietFamilyMealPlan> {
 
-    @Autowired
-    private DietDishMapper dishMapper;
-    @Autowired
-    private DietFamilyGroupMapper familyGroupMapper;
-    @Autowired
-    private DietFamilyMealPlanMapper familyMealPlanMapper;
-    @Autowired
-    private DietFamilyMealPlanDishMapper familyMealPlanDishMapper;
-    @Autowired
-    private DietFamilyMealPortionMapper familyMealPortionMapper;
-    @Autowired
-    private DietFamilyMealGroceryMapper familyMealGroceryMapper;
-    @Autowired
-    private DietDishIngredientMapper dishIngredientMapper;
-    @Autowired
-    private DietCookSkilledDishMapper cookSkilledDishMapper;
-    @Autowired
-    private DietCookDishStatMapper cookDishStatMapper;
-    @Autowired
-    private DietUserWishDishMapper userWishDishMapper;
-    @Autowired
-    private DietUserDislikeDishMapper userDislikeDishMapper;
-    @Autowired
-    private DietUserHealthProfileMapper userHealthProfileMapper;
-    @Autowired
-    private DietIngredientMapper ingredientMapper;
+    private final DietDishMapper dishMapper;
+    private final DietFamilyGroupMapper familyGroupMapper;
+    private final DietFamilyMealPlanMapper familyMealPlanMapper;
+    private final DietFamilyMealPlanDishMapper familyMealPlanDishMapper;
+    private final DietFamilyMealPortionMapper familyMealPortionMapper;
+    private final DietFamilyMealGroceryMapper familyMealGroceryMapper;
+    private final DietDishIngredientMapper dishIngredientMapper;
+    private final DietCookSkilledDishMapper cookSkilledDishMapper;
+    private final DietCookDishStatMapper cookDishStatMapper;
+    private final DietUserWishDishMapper userWishDishMapper;
+    private final DietUserDislikeDishMapper userDislikeDishMapper;
+    private final DietUserHealthProfileMapper userHealthProfileMapper;
+    private final DietIngredientMapper ingredientMapper;
+    private final DietDishCookingBranchMapper dishCookingBranchMapper;
 
     /**
-     * 生成家庭联合配餐推荐
+     * 生成家庭联合配餐推荐 (以做法分支为颗粒度)
      */
-    public List<DietDish> generateRecommendedMeal(Long groupId, LocalDate targetDate, Integer mealPeriod, Integer dietMode, int limit) {
-        LambdaQueryWrapper<DietDish> dishWrapper = new LambdaQueryWrapper<>();
-        dishWrapper.eq(DietDish::getDietMode, dietMode)
-                .eq(DietDish::getDelFlag, 0);
-        List<DietDish> allDishes = dishMapper.selectList(dishWrapper);
-        if (allDishes.isEmpty()) {
+    public List<DietDishCookingBranch> generateRecommendedMeal(Long groupId, LocalDate targetDate, Integer mealPeriod, Integer dietMode, int limit) {
+        LambdaQueryWrapper<DietDishCookingBranch> branchWrapper = new LambdaQueryWrapper<>();
+        branchWrapper.eq(DietDishCookingBranch::getDietMode, dietMode)
+                .eq(DietDishCookingBranch::getDelFlag, 0);
+        List<DietDishCookingBranch> allBranches = dishCookingBranchMapper.selectList(branchWrapper);
+        if (allBranches.isEmpty()) {
             return new ArrayList<>();
         }
 
@@ -93,9 +82,9 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
                 List<DietFamilyMealPlanDish> pastRelations = familyMealPlanDishMapper.selectList(pastDishWrapper);
 
                 if (!pastRelations.isEmpty()) {
-                    List<Long> pastDishIds = pastRelations.stream().map(DietFamilyMealPlanDish::getDishId).collect(Collectors.toList());
-                    List<DietDish> pastDishes = dishMapper.selectBatchIds(pastDishIds);
-                    cooledCuisines = pastDishes.stream().map(DietDish::getCuisineType).collect(Collectors.toSet());
+                    List<Long> pastBranchIds = pastRelations.stream().map(DietFamilyMealPlanDish::getBranchId).collect(Collectors.toList());
+                    List<DietDishCookingBranch> pastBranches = dishCookingBranchMapper.selectBatchIds(pastBranchIds);
+                    cooledCuisines = pastBranches.stream().map(DietDishCookingBranch::getCuisineType).collect(Collectors.toSet());
                 }
             }
         }
@@ -128,10 +117,13 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
             }
 
             if (!skilledDishIds.isEmpty()) {
-                List<DietDish> skilledList = dishMapper.selectBatchIds(skilledDishIds);
-                Map<String, Long> cuisineCounts = skilledList.stream()
-                        .collect(Collectors.groupingBy(DietDish::getCuisineType, Collectors.counting()));
-                long totalSkilled = skilledDishIds.size();
+                LambdaQueryWrapper<DietDishCookingBranch> branchCuisineWrapper = new LambdaQueryWrapper<>();
+                branchCuisineWrapper.in(DietDishCookingBranch::getDishId, skilledDishIds).eq(DietDishCookingBranch::getDelFlag, 0);
+                List<DietDishCookingBranch> skilledBranches = dishCookingBranchMapper.selectList(branchCuisineWrapper);
+
+                Map<String, Long> cuisineCounts = skilledBranches.stream()
+                        .collect(Collectors.groupingBy(DietDishCookingBranch::getCuisineType, Collectors.counting()));
+                long totalSkilled = skilledBranches.size();
                 for (Map.Entry<String, Long> entry : cuisineCounts.entrySet()) {
                     double ratio = (double) entry.getValue() / totalSkilled;
                     if (ratio >= 0.30 || entry.getValue() >= 2) {
@@ -162,12 +154,12 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
             }
         }
 
-        Map<DietDish, Double> dishWeights = new HashMap<>();
-        for (DietDish dish : allDishes) {
+        Map<DietDishCookingBranch, Double> branchWeights = new HashMap<>();
+        for (DietDishCookingBranch branch : allBranches) {
             double w = 1.0;
-            Long dishId = dish.getDishId();
+            Long dishId = branch.getDishId();
 
-            if (cooledCuisines.contains(dish.getCuisineType())) {
+            if (cooledCuisines.contains(branch.getCuisineType())) {
                 w = 0.0;
             }
 
@@ -186,7 +178,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
             if (skilledDishIds.contains(dishId)) {
                 w *= 1.4;
             }
-            if (skilledCuisines.contains(dish.getCuisineType())) {
+            if (skilledCuisines.contains(branch.getCuisineType())) {
                 w *= 1.2;
             }
             DietCookDishStat stat = statMap.get(dishId);
@@ -210,18 +202,18 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
             }
 
             if (w > 0.0) {
-                dishWeights.put(dish, w);
+                branchWeights.put(branch, w);
             }
         }
 
-        if (dishWeights.size() < limit) {
-            for (DietDish dish : allDishes) {
-                Long dishId = dish.getDishId();
+        if (branchWeights.size() < limit) {
+            for (DietDishCookingBranch branch : allBranches) {
+                Long dishId = branch.getDishId();
                 Integer dislikeCount = dislikeMap.get(dishId);
                 if (dislikeCount != null && dislikeCount >= 3) {
                     continue;
                 }
-                if (!dishWeights.containsKey(dish)) {
+                if (!branchWeights.containsKey(branch)) {
                     double w = 1.0;
                     double wishBoost = 1.0;
                     for (DietUserWishDish wish : wishes) {
@@ -235,7 +227,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
                     }
                     w *= wishBoost;
                     if (skilledDishIds.contains(dishId)) w *= 1.4;
-                    if (skilledCuisines.contains(dish.getCuisineType())) w *= 1.2;
+                    if (skilledCuisines.contains(branch.getCuisineType())) w *= 1.2;
                     DietCookDishStat stat = statMap.get(dishId);
                     if (stat != null) {
                         if (stat.getSignatureFlag() == 1) w *= 1.5;
@@ -245,48 +237,19 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
                         if (dislikeCount == 1) w *= 0.5;
                         else if (dislikeCount == 2) w *= 0.2;
                     }
-                    dishWeights.put(dish, w);
+                    branchWeights.put(branch, w);
                 }
             }
         }
 
-        if (dishWeights.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        List<DietDish> selectedDishes = new ArrayList<>();
-        List<Map.Entry<DietDish, Double>> entryList = new ArrayList<>(dishWeights.entrySet());
-
-        for (int i = 0; i < limit && !entryList.isEmpty(); i++) {
-            double totalWeight = entryList.stream().mapToDouble(Map.Entry::getValue).sum();
-            if (totalWeight <= 0) {
-                int randIndex = new Random().nextInt(entryList.size());
-                selectedDishes.add(entryList.get(randIndex).getKey());
-                entryList.remove(randIndex);
-                continue;
-            }
-            double randVal = new Random().nextDouble() * totalWeight;
-            double currentSum = 0.0;
-            int chosenIndex = 0;
-            for (int k = 0; k < entryList.size(); k++) {
-                currentSum += entryList.get(k).getValue();
-                if (randVal <= currentSum) {
-                    chosenIndex = k;
-                    break;
-                }
-            }
-            selectedDishes.add(entryList.get(chosenIndex).getKey());
-            entryList.remove(chosenIndex);
-        }
-
-        return selectedDishes;
+        return com.diet.modules.common.util.WeightedRandomUtil.selectWithoutReplacement(branchWeights, limit);
     }
 
     /**
      * 确认并保存膳食计划
      */
     @Transactional(rollbackFor = Exception.class)
-    public DietFamilyMealPlan saveMealPlan(Long groupId, LocalDate targetDate, Integer mealPeriod, Integer dietMode, List<Long> dishIds) {
+    public DietFamilyMealPlan saveMealPlan(Long groupId, LocalDate targetDate, Integer mealPeriod, Integer dietMode, List<Long> branchIds) {
         LambdaQueryWrapper<DietFamilyMealPlan> existQuery = new LambdaQueryWrapper<>();
         existQuery.eq(DietFamilyMealPlan::getGroupId, groupId)
                 .eq(DietFamilyMealPlan::getMealDate, targetDate)
@@ -322,16 +285,16 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
 
         Long mealPlanId = mealPlan.getMealPlanId();
 
-        for (Long dishId : dishIds) {
+        for (Long branchId : branchIds) {
             DietFamilyMealPlanDish rel = new DietFamilyMealPlanDish();
             rel.setMealPlanId(mealPlanId);
-            rel.setDishId(dishId);
+            rel.setBranchId(branchId);
             rel.setDelFlag(0);
             familyMealPlanDishMapper.insert(rel);
         }
 
-        List<DietDish> dishes = dishMapper.selectBatchIds(dishIds);
-        int dishCount = dishes.size();
+        List<DietDishCookingBranch> branches = dishCookingBranchMapper.selectBatchIds(branchIds);
+        int branchCount = branches.size();
 
         LambdaQueryWrapper<DietUserHealthProfile> profileWrapper = new LambdaQueryWrapper<>();
         profileWrapper.eq(DietUserHealthProfile::getGroupId, groupId)
@@ -339,19 +302,19 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         List<DietUserHealthProfile> profiles = userHealthProfileMapper.selectList(profileWrapper);
 
         double periodRatio = (mealPeriod == 1 || mealPeriod == 3) ? 0.3 : 0.4;
-        Map<Long, BigDecimal> dishTotalWeights = new HashMap<>();
-        for (DietDish dish : dishes) {
-            dishTotalWeights.put(dish.getDishId(), BigDecimal.ZERO);
+        Map<Long, BigDecimal> branchTotalWeights = new HashMap<>();
+        for (DietDishCookingBranch branch : branches) {
+            branchTotalWeights.put(branch.getBranchId(), BigDecimal.ZERO);
         }
 
         for (DietUserHealthProfile p : profiles) {
             if (p.getDailyTargetCalories() == null) continue;
             double mealCalBudget = p.getDailyTargetCalories().doubleValue() * periodRatio;
 
-            for (DietDish dish : dishes) {
+            for (DietDishCookingBranch branch : branches) {
                 double portionWeight = 0.0;
-                if (dish.getCalories().doubleValue() > 0 && dishCount > 0) {
-                    portionWeight = (mealCalBudget * 100) / (dish.getCalories().doubleValue() * dishCount);
+                if (branch.getCalories().doubleValue() > 0 && branchCount > 0) {
+                    portionWeight = (mealCalBudget * 100) / (branch.getCalories().doubleValue() * branchCount);
                 }
 
                 BigDecimal weightBD = BigDecimal.valueOf(portionWeight).setScale(2, RoundingMode.HALF_UP);
@@ -359,23 +322,23 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
                 DietFamilyMealPortion portion = new DietFamilyMealPortion();
                 portion.setMealPlanId(mealPlanId);
                 portion.setProfileId(p.getProfileId());
-                portion.setDishId(dish.getDishId());
+                portion.setBranchId(branch.getBranchId());
                 portion.setRecommendWeight(weightBD);
                 familyMealPortionMapper.insert(portion);
 
-                BigDecimal currentTotal = dishTotalWeights.get(dish.getDishId());
-                dishTotalWeights.put(dish.getDishId(), currentTotal.add(weightBD));
+                BigDecimal currentTotal = branchTotalWeights.get(branch.getBranchId());
+                branchTotalWeights.put(branch.getBranchId(), currentTotal.add(weightBD));
             }
         }
 
         Map<Long, BigDecimal> ingredientTotalGrams = new HashMap<>();
 
-        for (DietDish dish : dishes) {
-            BigDecimal dishTotalWeight = dishTotalWeights.get(dish.getDishId());
-            if (dishTotalWeight.compareTo(BigDecimal.ZERO) <= 0) continue;
+        for (DietDishCookingBranch branch : branches) {
+            BigDecimal branchTotalWeight = branchTotalWeights.get(branch.getBranchId());
+            if (branchTotalWeight.compareTo(BigDecimal.ZERO) <= 0) continue;
 
             LambdaQueryWrapper<DietDishIngredient> ingredWrapper = new LambdaQueryWrapper<>();
-            ingredWrapper.eq(DietDishIngredient::getDishId, dish.getDishId())
+            ingredWrapper.eq(DietDishIngredient::getBranchId, branch.getBranchId())
                     .eq(DietDishIngredient::getDelFlag, 0);
             List<DietDishIngredient> recipeIngredients = dishIngredientMapper.selectList(ingredWrapper);
             if (recipeIngredients.isEmpty()) continue;
@@ -386,7 +349,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
 
             if (recipeTotalWeight <= 0) continue;
 
-            double scale = dishTotalWeight.doubleValue() / recipeTotalWeight;
+            double scale = branchTotalWeight.doubleValue() / recipeTotalWeight;
 
             for (DietDishIngredient ri : recipeIngredients) {
                 double neededGram = ri.getUseAmount().doubleValue() * scale;
@@ -422,7 +385,9 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         List<DietFamilyMealPlanDish> relations = familyMealPlanDishMapper.selectList(relWrapper);
         if (relations.isEmpty()) return;
 
-        List<Long> dishIds = relations.stream().map(DietFamilyMealPlanDish::getDishId).collect(Collectors.toList());
+        List<Long> branchIds = relations.stream().map(DietFamilyMealPlanDish::getBranchId).collect(Collectors.toList());
+        List<DietDishCookingBranch> branches = dishCookingBranchMapper.selectBatchIds(branchIds);
+        List<Long> dishIds = branches.stream().map(DietDishCookingBranch::getDishId).distinct().collect(Collectors.toList());
 
         LambdaQueryWrapper<DietUserHealthProfile> profileWrapper = new LambdaQueryWrapper<>();
         profileWrapper.eq(DietUserHealthProfile::getGroupId, groupId)
@@ -525,16 +490,24 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         vo.setMealPlan(mealPlan);
         Long mealPlanId = mealPlan.getMealPlanId();
 
-        // 1. 获取关联的菜谱列表
+        // 1. 获取关联的做法分支列表并装填
         LambdaQueryWrapper<DietFamilyMealPlanDish> dishRelQuery = new LambdaQueryWrapper<>();
         dishRelQuery.eq(DietFamilyMealPlanDish::getMealPlanId, mealPlanId)
                 .eq(DietFamilyMealPlanDish::getDelFlag, 0);
         List<DietFamilyMealPlanDish> dishRels = familyMealPlanDishMapper.selectList(dishRelQuery);
 
-        List<DietDish> dishes = new ArrayList<>();
+        List<DietDishCookingBranch> dishes = new ArrayList<>();
         if (!dishRels.isEmpty()) {
-            List<Long> dishIds = dishRels.stream().map(DietFamilyMealPlanDish::getDishId).collect(Collectors.toList());
-            dishes = dishMapper.selectBatchIds(dishIds);
+            List<Long> branchIds = dishRels.stream().map(DietFamilyMealPlanDish::getBranchId).collect(Collectors.toList());
+            List<DietDishCookingBranch> rawBranches = dishCookingBranchMapper.selectBatchIds(branchIds);
+            for (DietDishCookingBranch b : rawBranches) {
+                DietDish dish = dishMapper.selectById(b.getDishId());
+                if (dish != null) {
+                    // 对做法分支的名字进行人性化拼接，如：西兰花炒牛肉 (健身无油版)
+                    b.setBranchName(dish.getDishName() + " (" + b.getBranchName() + ")");
+                }
+                dishes.add(b);
+            }
         }
         vo.setDishes(dishes);
 
@@ -548,7 +521,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         for (DietFamilyMealPortion portion : portions) {
             com.diet.modules.biz.model.vo.DietPortionVO item = new com.diet.modules.biz.model.vo.DietPortionVO();
             item.setPortionId(portion.getPortionId());
-            item.setDishId(portion.getDishId());
+            item.setDishId(portion.getBranchId()); // VO 的属性仍名 dishId，在此将做法分支关联赋值
             item.setRecommendWeight(portion.getRecommendWeight());
             item.setProfileId(portion.getProfileId());
 

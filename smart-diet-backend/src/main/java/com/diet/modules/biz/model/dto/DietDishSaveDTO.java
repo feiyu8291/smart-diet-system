@@ -1,8 +1,8 @@
 package com.diet.modules.biz.model.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -12,18 +12,19 @@ import java.util.List;
  * @date 2026-06-22
  */
 @Data
+@Schema(description = "菜谱完整信息保存传输对象")
 public class DietDishSaveDTO {
+    @Schema(description = "菜谱ID")
     private Long dishId;
+    @Schema(description = "菜谱名称")
     private String dishName;
-    private String cuisineType;
-    private Integer dietMode; // 建议就餐模式 (0-正常, 1-轻食, 2-放纵)
-    private BigDecimal calories; // 选填，若为null或0则由后端按原材料比例重算
-    private BigDecimal protein;  // 选填
-    private BigDecimal fat;      // 选填
-    private BigDecimal carbs;    // 选填
-    private Long coverImageId;   // 封面图片ID
-    private String imageIds;     // 成品图片ID列表 (最多3张，逗号分隔)
+    @Schema(description = "封面图片ID")
+    private Long coverImageId;
 
+    @Schema(description = "原材料列表")
     private List<DietDishIngredientSaveDTO> ingredients;
+    @Schema(description = "步骤列表")
     private List<DietDishStepSaveDTO> steps;
+    @Schema(description = "做法分支列表")
+    private List<DietDishBranchSaveDTO> branches;
 }

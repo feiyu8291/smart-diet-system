@@ -1,18 +1,25 @@
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://${DB_HOST:-host.docker.internal}:${DB_PORT:-5432}/${DB_NAME:-smart_diet}
-    username: ${DB_USER:-postgres}
-    password: ${DB_PASSWORD:-postgres}
+    url: jdbc:postgresql://${DB_HOST:host.docker.internal}:${DB_PORT:5432}/${DB_NAME:smart_diet}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
   data:
     redis:
-      host: ${REDIS_HOST:-redis}
-      port: ${REDIS_PORT:-6379}
-      password: ${REDIS_PWD:-}
-      database: ${REDIS_DB:-0}
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PWD:}
+      database: ${REDIS_DB:0}
 
-minio:
-  endpoint: ${MINIO_ENDPOINT:-http://host.docker.internal:9000}
-  bucketName: ${MINIO_BUCKET:-smart-diet}
-  accessKey: ${MINIO_ACCESS_KEY:-minioadmin}
-  secretKey: ${MINIO_SECRET_KEY:-minioadmin}
+amz:
+  s3:
+    region: fly-minio
+    endPoint: ${MINIO_ENDPOINT:http://host.docker.internal:9000}
+    domain: ${MINIO_ENDPOINT:http://host.docker.internal:9000}
+    accessKey: ${MINIO_ACCESS_KEY:minioadmin}
+    secretKey: ${MINIO_SECRET_KEY:minioadmin}
+    defaultBucket: ${MINIO_BUCKET:smart-diet}
+    timeFormat: yyyy-MM
+    pathStyleAccess: true
+    backendSever: http://host.docker.internal:8080/api/s3Storage/preview
+

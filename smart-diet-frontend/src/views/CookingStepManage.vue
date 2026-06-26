@@ -1,54 +1,83 @@
 <template>
   <div class="content-container section-gap">
-    <div class="header-section">
-      <span class="eyebrow">DIET PREPARATION STEPS</span>
-      <h1 class="display-lg">烹饪步骤库管理</h1>
-    </div>
+    <el-card class="cooking-step-manage-card">
+      <!-- 统一的页面头部修饰栏 -->
+      <div class="panel-header-section">
+        <h3 class="page-title">
+          <el-icon class="title-icon">
+            <Notebook/>
+          </el-icon>
+          烹饪步骤模板管理
+        </h3>
+        <span class="sub-title">系统膳食烹饪标准步骤模板维护，规范多渠道烹饪环节命名与默认细化指导说明</span>
+      </div>
 
-    <div class="cooking-step-manage-card color-block">
-      <!-- 顶部搜索栏与操作按钮 -->
-      <div class="toolbar-section">
-        <div class="search-form">
-          <input
-              type="text"
-              v-model="searchQuery"
-              class="input-text"
-              placeholder="搜索步骤名称..."
-              @keyup.enter="loadSteps"
-              style="width: 260px;"
-          />
-          <button class="btn-primary" @click="loadSteps">搜索</button>
-          <button class="btn-secondary" @click="resetSearch">重置</button>
+      <!-- 搜索与操作栏（合并为单行展示） -->
+      <div class="search-bar" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+        <el-form :inline="true" @submit.prevent style="margin-bottom: 0;">
+          <el-form-item label="步骤名称">
+            <el-input
+                v-model="searchQuery"
+                placeholder="搜索步骤名称..."
+                clearable
+                @keyup.enter="handleSearch"
+                style="width: 240px;"
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleSearch">搜索</el-button>
+            <el-button @click="resetSearch">重置</el-button>
+          </el-form-item>
+        </el-form>
+        <div class="action-buttons">
+          <el-button type="primary" @click="openCreateModal">
+            <el-icon style="margin-right: 4px;">
+              <Plus/>
+            </el-icon>
+            新增步骤模板
+          </el-button>
         </div>
-        <button class="btn-primary" @click="openCreateModal">
-          + 新增步骤模板
-        </button>
       </div>
 
       <!-- 操作步骤表格 -->
       <el-table
           v-loading="loading"
           :data="steps"
-          style="width: 100%; margin-top: 20px"
-          class="custom-table"
+          border
+          max-height="calc(100vh - 240px)"
+          style="width: 100%; margin-top: 10px"
       >
         <el-table-column prop="stepPoolId" label="步骤ID" width="100" align="center"/>
         <el-table-column prop="stepName" label="步骤名称" width="200"/>
         <el-table-column prop="stepDetail" label="默认步骤描述" min-width="400" show-overflow-tooltip/>
-        <el-table-column label="操作" width="180" align="center" fixed="right">
+        <el-table-column label="操作" width="150" align="center" fixed="right">
           <template #default="scope">
             <el-button type="primary" link @click="openEditModal(scope.row)">编辑</el-button>
             <el-button type="danger" link @click="handleDelete(scope.row.stepPoolId)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
-    </div>
+
+      <!-- 真分页器 -->
+      <div class="pagination">
+        <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[5, 10, 20, 50]"
+            :total="totalCount"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+        />
+      </div>
+    </el-card>
 
     <!-- 新增 / 编辑步骤模板 Dialog -->
     <el-dialog
         v-model="modalVisible"
         :title="form.stepPoolId ? '编辑步骤模板' : '新增步骤模板'"
         width="500px"
+        custom-class="premium-dialog"
     >
       <div class="step-form">
         <div class="form-item">
@@ -82,12 +111,18 @@
 <script setup lang="ts">
 import {onMounted, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
+import {Notebook, Plus} from '@element-plus/icons-vue'
 import request from '../utils/request'
 
 const loading = ref(false)
 const steps = ref<any[]>([])
 const searchQuery = ref('')
 const modalVisible = ref(false)
+
+// 分页相关变量
+const currentPage = ref(1)
+const pageSize = ref(10)
+const totalCount = ref(0)
 
 const defaultForm = {
   stepPoolId: null as number | null,
@@ -96,14 +131,19 @@ const defaultForm = {
 }
 const form = ref({...defaultForm})
 
-// 加载步骤列表
+// 加载步骤列表 (分页)
 const loadSteps = async () => {
   loading.value = true
   try {
-    const url = searchQuery.value.trim()
-        ? `/api/step/list?name=${encodeURIComponent(searchQuery.value.trim())}`
-        : '/api/step/list'
-    steps.value = await request.get(url)
+    let url = `/api/step/page?pageNo=${currentPage.value}&pageSize=${pageSize.value}`
+    if (searchQuery.value.trim()) {
+      url += `&name=${encodeURIComponent(searchQuery.value.trim())}`
+    }
+    const res: any = await request.get(url)
+    if (res && res.code === 200) {
+      steps.value = res.data || []
+      totalCount.value = res.page ? res.page.total : steps.value.length
+    }
   } catch (e) {
     console.error('获取步骤列表失败', e)
   } finally {
@@ -111,8 +151,14 @@ const loadSteps = async () => {
   }
 }
 
+const handleSearch = () => {
+  currentPage.value = 1
+  loadSteps()
+}
+
 const resetSearch = () => {
   searchQuery.value = ''
+  currentPage.value = 1
   loadSteps()
 }
 
@@ -173,23 +219,59 @@ const handleDelete = (stepPoolId: number) => {
   })
 }
 
+// 分页切换处理器
+const handleSizeChange = (val: number) => {
+  pageSize.value = val
+  currentPage.value = 1
+  loadSteps()
+}
+
+const handleCurrentChange = (val: number) => {
+  currentPage.value = val
+  loadSteps()
+}
+
 onMounted(() => {
   loadSteps()
 })
 </script>
 
 <style scoped>
-.toolbar-section {
+.panel-header-section {
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 16px;
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 8px;
+  margin: 0 0 6px 0;
+}
+
+.title-icon {
+  font-size: 20px;
+  color: var(--primary);
+}
+
+.sub-title {
+  font-size: 13px;
+  color: var(--ink-subtle);
+  display: block;
+}
+
+.search-bar {
   margin-bottom: 20px;
 }
 
-.search-form {
+.pagination {
+  margin-top: 24px;
   display: flex;
-  gap: 10px;
-  align-items: center;
+  justify-content: flex-end;
 }
 
 .step-form {

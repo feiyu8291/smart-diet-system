@@ -1,5 +1,6 @@
 package com.diet.modules.biz.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.diet.modules.biz.model.dto.DietDishSaveDTO;
 import com.diet.modules.biz.model.dto.DietDislikeDTO;
 import com.diet.modules.biz.model.dto.DietSkilledDTO;
@@ -38,9 +39,16 @@ public class DietDishController {
         return Result.success(list);
     }
 
+    @Operation(summary = "菜谱分页查询")
+    @GetMapping("/page")
+    public Result<List<DietDishVO>> pageDishes(DietDishQueryPO po) {
+        IPage<DietDishVO> page = dishService.pageDishes(po);
+        return Result.successPage(page);
+    }
+
     @Operation(summary = "查询菜谱详情")
-    @GetMapping("/detail/{dishId}")
-    public Result<DietDishDetailVO> getDishDetail(@PathVariable Long dishId) {
+    @GetMapping("/detail")
+    public Result<DietDishDetailVO> getDishDetail(@RequestParam Long dishId) {
         DietDishDetailVO detail = dishService.getDishDetail(dishId);
         return Result.success(detail);
     }
@@ -77,6 +85,13 @@ public class DietDishController {
     @DeleteMapping("/delete/{dishId}")
     public Result<Boolean> deleteDish(@PathVariable Long dishId) {
         Boolean success = dishService.deleteDish(dishId);
+        return Result.success(success);
+    }
+
+    @Operation(summary = "删除做法分支")
+    @DeleteMapping("/delete/branch/{branchId}")
+    public Result<Boolean> deleteBranch(@PathVariable Long branchId) {
+        Boolean success = dishService.deleteBranch(branchId);
         return Result.success(success);
     }
 }

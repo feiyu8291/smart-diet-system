@@ -1,7 +1,10 @@
 package com.diet.modules.biz.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.diet.modules.biz.model.entity.DietIngredient;
+import com.diet.modules.biz.model.po.DietIngredientQueryPO;
 import com.diet.modules.biz.service.DietIngredientService;
 import com.diet.modules.common.entity.Result;
 import io.swagger.v3.oas.annotations.Operation;
@@ -45,6 +48,27 @@ public class DietIngredientController {
 
         List<DietIngredient> list = ingredientService.list(query);
         return Result.success(list);
+    }
+
+    @Operation(summary = "原材料分页查询")
+    @GetMapping("/page")
+    public Result<List<DietIngredient>> page(DietIngredientQueryPO po) {
+        if (po == null) {
+            po = new DietIngredientQueryPO();
+        }
+        Page<DietIngredient> page = new Page<>(po.getPageNo(), po.getPageSize());
+        LambdaQueryWrapper<DietIngredient> query = new LambdaQueryWrapper<>();
+        query.eq(DietIngredient::getDelFlag, 0);
+        if (po.getName() != null && !po.getName().trim().isEmpty()) {
+            query.like(DietIngredient::getIngredientName, po.getName().trim());
+        }
+        if (po.getCondimentFlag() != null) {
+            query.eq(DietIngredient::getCondimentFlag, po.getCondimentFlag());
+        }
+        query.orderByAsc(DietIngredient::getIngredientId);
+
+        IPage<DietIngredient> pageResult = ingredientService.page(page, query);
+        return Result.successPage(pageResult);
     }
 
     @Operation(summary = "保存/修改原材料")

@@ -2,7 +2,6 @@ package com.diet.modules.biz.controller;
 
 import com.diet.modules.biz.model.dto.DietMealCompleteDTO;
 import com.diet.modules.biz.model.dto.DietMealPlanSaveDTO;
-import com.diet.modules.biz.model.entity.DietDish;
 import com.diet.modules.biz.model.entity.DietFamilyMealPlan;
 import com.diet.modules.biz.model.po.DietMealDetailQueryPO;
 import com.diet.modules.biz.model.po.DietMealRecommendQueryPO;
@@ -49,23 +48,23 @@ public class DietFamilyMealPlanController {
 
     @Operation(summary = "获取联合配餐推荐菜品")
     @GetMapping("/recommend")
-    public Result<List<DietDish>> getRecommendations(DietMealRecommendQueryPO po) {
+    public Result<List<com.diet.modules.biz.model.entity.DietDishCookingBranch>> getRecommendations(DietMealRecommendQueryPO po) {
         LocalDate date = LocalDate.parse(po.getTargetDate());
-        List<DietDish> dishes = familyMealPlanService.generateRecommendedMeal(
+        List<com.diet.modules.biz.model.entity.DietDishCookingBranch> branches = familyMealPlanService.generateRecommendedMeal(
                 po.getGroupId(), date, po.getMealPeriod(), po.getDietMode(), po.getLimit());
-        return Result.success(dishes);
+        return Result.success(branches);
     }
 
     @Operation(summary = "保存联合配餐计划")
     @PostMapping("/save")
     public Result<DietFamilyMealPlan> saveMealPlan(@RequestBody DietMealPlanSaveDTO dto) {
         if (dto == null || dto.getGroupId() == null || dto.getTargetDate() == null
-                || dto.getMealPeriod() == null || dto.getDietMode() == null || dto.getDishIds() == null) {
+                || dto.getMealPeriod() == null || dto.getDietMode() == null || dto.getBranchIds() == null) {
             throw new RuntimeException("参数不完整，保存失败");
         }
         LocalDate date = LocalDate.parse(dto.getTargetDate());
         DietFamilyMealPlan mealPlan = familyMealPlanService.saveMealPlan(
-                dto.getGroupId(), date, dto.getMealPeriod(), dto.getDietMode(), dto.getDishIds());
+                dto.getGroupId(), date, dto.getMealPeriod(), dto.getDietMode(), dto.getBranchIds());
         return Result.success(mealPlan);
     }
 

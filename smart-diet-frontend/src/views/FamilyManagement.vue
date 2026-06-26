@@ -2,28 +2,66 @@
   <div class="content-container section-gap">
     <div class="family-layout">
       <!-- 左侧：家庭分组管理面板 -->
-      <div class="group-panel hairline-border">
-        <div class="panel-header">
+      <div class="group-panel hairline-border" style="padding: 16px;">
+        <div class="panel-header" style="margin-bottom: 12px;">
           <span class="eyebrow">FAMILY GROUPS</span>
-          <h2 class="panel-title">我的家庭组</h2>
+          <h2 class="panel-title">所有家庭组</h2>
         </div>
-        <button class="btn-primary add-group-btn" @click="groupModalVisible = true">
-          + 新增家庭组
-        </button>
 
-        <div class="group-list">
-          <div
-              v-for="g in groups"
-              :key="g.groupId"
-              :class="['group-item', { active: activeGroupIdRef.value === g.groupId }]"
-              @click="changeGroupId(g.groupId)"
-          >
-            <span class="group-name">🏠 {{ g.groupName }}</span>
-            <button class="btn-delete-group" @click.stop="handleDeleteGroup(g.groupId)">✕</button>
-          </div>
-          <div v-if="groups.length === 0" class="empty-tip">
-            暂无家庭组，请先新增。
-          </div>
+        <!-- 紧凑模糊搜索与新增 -->
+        <div class="group-search" style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center; width: 100%;">
+          <el-input
+              v-model="groupSearchName"
+              placeholder="搜索家庭组..."
+              clearable
+              size="default"
+              @keyup.enter="handleGroupSearch"
+              style="flex: 1;"
+          />
+          <el-button type="primary" @click="handleGroupSearch">查询</el-button>
+          <el-button @click="openCreateGroupModal">新增</el-button>
+        </div>
+
+        <!-- 家庭组表格分页列表 -->
+        <el-table
+            :data="groupsPageData"
+            v-loading="groupsLoading"
+            highlight-current-row
+            ref="groupTableRef"
+            @current-change="handleGroupSelectChange"
+            size="default"
+            style="width: 100%; border-radius: var(--rounded-md); overflow: hidden;"
+            max-height="calc(100vh - 360px)"
+        >
+          <el-table-column prop="groupId" label="ID" width="60" align="center"/>
+          <el-table-column prop="groupName" label="组名称" min-width="150" show-overflow-tooltip>
+            <template #default="scope">
+              <span style="font-weight: 500;">🏠 {{ scope.row.groupName }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="cooldownDays" label="冷却时间" width="95" align="center">
+            <template #default="scope">
+              <span>{{ scope.row.cooldownDays != null ? scope.row.cooldownDays : 3 }} 天</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="110" align="center">
+            <template #default="scope">
+              <el-button type="primary" link @click.stop="handleEditGroup(scope.row)">编辑</el-button>
+              <el-button type="danger" link @click.stop="handleDeleteGroup(scope.row.groupId)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <!-- 家庭组小分页 -->
+        <div class="group-pagination" style="margin-top: 15px; display: flex; justify-content: flex-end;">
+          <el-pagination
+              v-model:current-page="groupCurrentPage"
+              v-model:page-size="groupPageSize"
+              :total="groupTotal"
+              layout="prev, pager, next"
+              small
+              @current-change="handleGroupPageChange"
+          />
         </div>
       </div>
 
@@ -32,9 +70,11 @@
         <div class="header-section">
           <div>
             <span class="eyebrow">FAMILY HEALTH ARCHIVE</span>
-            <h1 class="display-lg">家庭成员档案</h1>
+            <h1 class="display-lg">
+              {{ selectedGroupRow ? `【${selectedGroupRow.groupName}】成员档案` : '家庭成员档案' }}
+            </h1>
           </div>
-          <button class="btn-primary" @click="handleOpenCreateModal">
+          <button class="btn-primary" :disabled="!groupId" @click="handleOpenCreateModal">
             + 新增就餐人
           </button>
         </div>
@@ -93,12 +133,15 @@
             <div class="params-row body-sm">
               <span>身高: <strong>{{ member.memberHeight }} cm</strong></span>
               <span>体重: <strong>{{ member.memberWeight }} kg</strong></span>
-              <span>年龄: <strong>{{ member.memberAge }} 岁</strong></span>
+              <span>生日/年龄: <strong>{{ member.memberBirthday }} ({{ calculateAge(member.memberBirthday) }}岁)</strong></span>
               <span>目标: <strong>{{ member.targetWeight }} kg</strong></span>
             </div>
           </div>
         </div>
-        <div v-if="members.length === 0" class="empty-tip-members color-block">
+        <div v-if="!groupId" class="empty-tip-members color-block" style="text-align: center; padding: 40px; color: var(--ink-subtle);">
+          请先在左侧选择一个家庭组。
+        </div>
+        <div v-else-if="members.length === 0" class="empty-tip-members color-block">
           当前家庭组下暂无就餐人档案，点击右上角“新增就餐人”开始录入。
         </div>
       </div>
@@ -108,7 +151,7 @@
     <el-dialog
         v-model="modalVisible"
         :title="form.profileId ? '编辑健康档案测评' : '新增就餐成员测评'"
-        width="560px"
+        width="580px"
     >
       <div class="member-form">
         <!-- 成员称呼 -->
@@ -129,22 +172,43 @@
           </div>
         </div>
 
-        <!-- 绑定系统账号 vs 离线无账号 -->
+        <!-- 身份证号码 (自动提取生日与性别) -->
         <div class="form-item">
-          <label class="caption">账号绑定状态</label>
-          <el-select v-model="bindStatus" placeholder="选择就餐人是否为在线账号" style="width: 100%">
-            <el-option :value="0" label="离线成员（免注册，仅做饭人维护其健康指标）"/>
-            <el-option :value="1" label="在线用户（关联本人注册的系统账号）"/>
-          </el-select>
+          <label class="caption">身份证号码</label>
+          <input
+              type="text"
+              v-model="form.idCardNum"
+              class="input-text"
+              placeholder="输入18位身份证号自动识别并反填生日与性别"
+              maxlength="18"
+              @input="handleIdCardInput"
+          />
         </div>
 
-        <!-- 只有绑定账号时输入关联 ID -->
-        <div class="form-item" v-if="bindStatus === 1">
-          <label class="caption">系统注册用户 ID</label>
-          <input type="number" v-model="form.userId" class="input-text" placeholder="输入关联的 sys_user.user_id"/>
+        <!-- 绑定系统账号 vs 离线无账号 -->
+        <div class="form-row-2">
+          <div class="form-item">
+            <label class="caption">账号绑定状态</label>
+            <el-select v-model="bindStatus" placeholder="选择绑定状态" style="width: 100%">
+              <el-option :value="0" label="离线成员（仅做饭人维护指标）"/>
+              <el-option :value="1" label="在线用户（关联系统账号）"/>
+            </el-select>
+          </div>
+          <!-- 绑定系统账号下拉选择 -->
+          <div class="form-item" v-if="bindStatus === 1">
+            <label class="caption">关联系统用户账户</label>
+            <el-select v-model="form.userId" filterable placeholder="选择关联的系统账号" style="width: 100%" clearable>
+              <el-option
+                  v-for="user in allSysUsers"
+                  :key="user.userId"
+                  :label="`${user.realName} (${user.username})`"
+                  :value="user.userId"
+              />
+            </el-select>
+          </div>
         </div>
 
-        <!-- 性别、年龄 -->
+        <!-- 性别、出生日期 -->
         <div class="form-row-2">
           <div class="form-item">
             <label class="caption">成员性别</label>
@@ -154,8 +218,14 @@
             </el-select>
           </div>
           <div class="form-item">
-            <label class="caption">年龄 (周岁)</label>
-            <input type="number" v-model="form.memberAge" class="input-text" placeholder="年龄"/>
+            <label class="caption">出生日期</label>
+            <el-date-picker
+                v-model="form.memberBirthday"
+                type="date"
+                placeholder="选择出生日期"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+            />
           </div>
         </div>
 
@@ -208,16 +278,20 @@
       </template>
     </el-dialog>
 
-    <!-- 新建家庭组 Dialog -->
+    <!-- 新建 / 编辑家庭组 Dialog -->
     <el-dialog
         v-model="groupModalVisible"
-        title="新建家庭组"
+        :title="groupForm.groupId ? '编辑家庭组' : '新建家庭组'"
         width="400px"
     >
       <div class="member-form">
         <div class="form-item">
           <label class="caption">家庭组名称</label>
           <input type="text" v-model="groupForm.groupName" class="input-text" placeholder="例如: 我的小家庭、老李的大家庭"/>
+        </div>
+        <div class="form-item" style="margin-top: 12px;">
+          <label class="caption">减脂重置冷却天数 (天)</label>
+          <input type="number" v-model="groupForm.cooldownDays" class="input-text" placeholder="例如: 3"/>
         </div>
       </div>
       <template #footer>
@@ -229,71 +303,187 @@
 </template>
 
 <script setup lang="ts">
-import {inject, onMounted, ref, unref} from 'vue'
+import {computed, inject, nextTick, onMounted, ref, unref, watch} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
+import {Delete, Edit} from '@element-plus/icons-vue'
 import request from '../utils/request'
 
 const activeGroupIdRef = inject<any>('groupId')
 const changeGroupId = inject<any>('changeGroupId')
 const cookUserId = inject<number>('cookUserId', 1)
 
-// 解包后的 groupId 值，每次组件重新挂载时自动重新 inject 读取最新值
-const groupId = unref(activeGroupIdRef) || 1
+const groupId = computed(() => unref(activeGroupIdRef) || 1)
 
 const members = ref<any[]>([])
-const groups = ref<any[]>([])
+const groupsPageData = ref<any[]>([])
+const groupsLoading = ref(false)
+const groupSearchName = ref('')
+const groupCurrentPage = ref(1)
+const groupPageSize = ref(10)
+const groupTotal = ref(0)
+const selectedGroupRow = ref<any>(null)
+const groupTableRef = ref<any>(null)
+
+const allSysUsers = ref<any[]>([])
 const modalVisible = ref(false)
 const groupModalVisible = ref(false)
-const bindStatus = ref(0) // 默认离线
+const bindStatus = ref(0)
 
 const defaultForm = {
   profileId: null as number | null,
   userId: null as number | null,
-  groupId: groupId,
+  groupId: groupId.value,
   groupRole: 2,
   memberName: '',
+  idCardNum: '',
   memberRelation: '配偶',
   memberGender: 1,
   memberHeight: 170.0,
   memberWeight: 65.0,
-  memberAge: 30,
+  memberBirthday: '1995-01-01',
   activityLevel: 2,
   targetWeight: 60.0,
   dietSpeed: 0.50
 }
-const form = ref({...defaultForm})
-const groupForm = ref({
-  groupName: ''
-})
+const form = ref<any>({...defaultForm})
+
+const defaultGroupForm = {
+  groupId: null as number | null,
+  groupName: '',
+  cooldownDays: 3
+}
+const groupForm = ref({...defaultGroupForm})
+
+const calculateAge = (birthdayStr: string) => {
+  if (!birthdayStr) return 0
+  const birthDate = new Date(birthdayStr)
+  if (isNaN(birthDate.getTime())) return 0
+  const today = new Date()
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const m = today.getMonth() - birthDate.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--
+  }
+  return age >= 0 ? age : 0
+}
+
+// 身份证号码输入侦听与生日、性别反填
+const handleIdCardInput = (e: any) => {
+  const val = e.target.value
+  const reg = /^[1-9]\d{5}(18|19|20)\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$/
+  if (val.length === 18 && reg.test(val)) {
+    const year = val.substring(6, 10)
+    const month = val.substring(10, 12)
+    const day = val.substring(12, 14)
+    form.value.memberBirthday = `${year}-${month}-${day}`
+
+    const genderDigit = Number(val.substring(16, 17))
+    form.value.memberGender = (genderDigit % 2 === 1) ? 1 : 2
+    ElMessage.success('已根据身份证号码自动识别提取生日与性别！')
+  }
+}
+
+const loadSysUsers = async () => {
+  try {
+    const res: any = await request.get('/sys/user/listAll')
+    allSysUsers.value = res.data || res || []
+  } catch (err) {
+    console.error(err)
+  }
+}
 
 const loadGroups = async () => {
+  groupsLoading.value = true
   try {
-    const list = await request.get(`/api/group/list?userId=${cookUserId}`)
-    groups.value = list
-    // 如果本地存储没有选中的 activeGroupId，或者当前选中的 group 不在列表里，默认选第一个
-    if (list.length > 0) {
-      const activeExists = list.some((g: any) => g.groupId === activeGroupIdRef.value)
-      if (!activeExists) {
-        changeGroupId(list[0].groupId)
+    let url = `/api/group/page?pageNo=${groupCurrentPage.value}&pageSize=${groupPageSize.value}`
+    if (groupSearchName.value.trim()) {
+      url += `&groupName=${encodeURIComponent(groupSearchName.value.trim())}`
+    }
+    const res: any = await request.get(url)
+    if (res && res.code === 200) {
+      groupsPageData.value = res.data.records || []
+      groupTotal.value = res.data.total || 0
+
+      // 定位高亮行
+      if (groupsPageData.value.length > 0) {
+        const activeId = activeGroupIdRef.value || groupsPageData.value[0].groupId
+        const activeRow = groupsPageData.value.find((g: any) => g.groupId === activeId)
+        nextTick(() => {
+          if (groupTableRef.value) {
+            if (activeRow) {
+              groupTableRef.value.setCurrentRow(activeRow)
+              selectedGroupRow.value = activeRow
+            } else {
+              groupTableRef.value.setCurrentRow(groupsPageData.value[0])
+              selectedGroupRow.value = groupsPageData.value[0]
+            }
+          }
+        })
+      } else {
+        selectedGroupRow.value = null
+        changeGroupId(null)
+        members.value = []
       }
     }
   } catch (e) {
+    console.error(e)
+  } finally {
+    groupsLoading.value = false
   }
 }
 
+const handleGroupSelectChange = (row: any) => {
+  if (row) {
+    selectedGroupRow.value = row
+    changeGroupId(row.groupId)
+    loadMembers()
+  }
+}
+
+const handleGroupSearch = () => {
+  groupCurrentPage.value = 1
+  loadGroups()
+}
+
+const handleGroupPageChange = (val: number) => {
+  groupCurrentPage.value = val
+  loadGroups()
+}
+
+const openCreateGroupModal = () => {
+  groupForm.value = {...defaultGroupForm}
+  groupModalVisible.value = true
+}
+
+const handleEditGroup = (row: any) => {
+  groupForm.value = {
+    groupId: row.groupId,
+    groupName: row.groupName,
+    cooldownDays: row.cooldownDays || 3
+  }
+  groupModalVisible.value = true
+}
+
 const loadMembers = async () => {
+  if (!groupId.value) {
+    members.value = []
+    return
+  }
   try {
-    members.value = await request.get(`/api/profile/list?groupId=${groupId}`)
+    members.value = await request.get(`/api/profile/list?groupId=${groupId.value}`)
   } catch (e) {
   }
 }
+
+watch(groupId, () => {
+  loadMembers()
+})
 
 const getMemberCardColor = (idx: number): string => {
   const colors = ['color-block-lime', 'color-block-lilac', 'color-block-cream', 'color-block-mint', 'color-block-pink', 'color-block-coral']
   return colors[idx % colors.length]
 }
 
-// 计算 BMI 辅助函数
 const calculateBMI = (member: any): string => {
   if (!member.memberWeight || !member.memberHeight) return '0.0'
   const heightM = member.memberHeight / 100.0
@@ -307,7 +497,7 @@ const calculateBMI = (member: any): string => {
 }
 
 const handleOpenCreateModal = () => {
-  form.value = {...defaultForm, groupId: groupId}
+  form.value = {...defaultForm, groupId: groupId.value}
   bindStatus.value = 0
   modalVisible.value = true
 }
@@ -321,6 +511,10 @@ const handleEdit = (member: any) => {
 const handleSaveProfile = async () => {
   if (!form.value.memberName) {
     ElMessage.warning('请输入就餐人姓名或称呼！')
+    return
+  }
+  if (!form.value.memberBirthday) {
+    ElMessage.warning('出生日期不能为空！')
     return
   }
   if (bindStatus.value === 0) {
@@ -360,7 +554,6 @@ const handleDelete = (profileId: number) => {
   })
 }
 
-// 新增家庭组
 const handleSaveGroup = async () => {
   if (!groupForm.value.groupName.trim()) {
     ElMessage.warning('请输入家庭组名称！')
@@ -368,21 +561,22 @@ const handleSaveGroup = async () => {
   }
   try {
     const payload = {
+      groupId: groupForm.value.groupId,
       groupName: groupForm.value.groupName.trim(),
-      creatorUserId: cookUserId
+      creatorUserId: cookUserId,
+      cooldownDays: groupForm.value.cooldownDays
     }
     const res = await request.post('/api/group/save', payload)
     if (res) {
-      ElMessage.success('新建家庭组成功！')
+      ElMessage.success(groupForm.value.groupId ? '编辑家庭组成功！' : '新建家庭组成功！')
       groupModalVisible.value = false
-      groupForm.value.groupName = ''
       await loadGroups()
     }
   } catch (e) {
+    console.error(e)
   }
 }
 
-// 删除家庭组
 const handleDeleteGroup = (targetGroupId: number) => {
   ElMessageBox.confirm(
       '确认删除该家庭组？该操作将软删除该分组。',
@@ -399,6 +593,7 @@ const handleDeleteGroup = (targetGroupId: number) => {
         ElMessage.success('家庭组已删除！')
         if (activeGroupIdRef.value === targetGroupId) {
           localStorage.removeItem('activeGroupId')
+          changeGroupId(null)
         }
         await loadGroups()
       }
@@ -410,7 +605,7 @@ const handleDeleteGroup = (targetGroupId: number) => {
 
 onMounted(() => {
   loadGroups()
-  loadMembers()
+  loadSysUsers()
 })
 </script>
 
@@ -422,8 +617,8 @@ onMounted(() => {
 }
 
 .group-panel {
-  width: 260px;
-  min-width: 260px;
+  width: 550px;
+  min-width: 550px;
   background-color: var(--surface-1);
   border: 1px solid var(--hairline);
   border-radius: var(--rounded-lg);
@@ -530,15 +725,16 @@ onMounted(() => {
 
 .members-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--spacing-lg);
 }
 
 .member-card {
-  min-height: 280px;
+  min-height: 230px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  padding: 16px;
 }
 
 .member-header {
@@ -588,7 +784,7 @@ onMounted(() => {
 }
 
 .metric-value {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
   display: flex;
   align-items: baseline;
@@ -596,16 +792,19 @@ onMounted(() => {
 }
 
 .metric-value .unit {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 400;
 }
 
 .params-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  row-gap: 4px;
+  column-gap: 8px;
   border-top: 1px dashed var(--hairline);
   padding-top: var(--spacing-sm);
   color: var(--ink-muted);
+  font-size: 12px;
 }
 
 .member-form {

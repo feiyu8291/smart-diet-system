@@ -3,7 +3,7 @@ import {createRouter, createWebHistory} from 'vue-router'
 const routes = [
     {
         path: '/',
-        redirect: '/dashboard'
+        redirect: '/profile/personal'
     },
     {
         path: '/login',
@@ -12,40 +12,22 @@ const routes = [
         meta: {title: '登录 - 智能膳食系统'}
     },
     {
-        path: '/dashboard',
-        name: 'Dashboard',
-        component: () => import('../views/PlanDashboard.vue'),
-        meta: {title: '计划进度 - 智能膳食系统'}
-    },
-    {
-        path: '/m/dashboard',
-        name: 'MobileDashboard',
-        component: () => import('../views/mobile/MobileDashboard.vue'),
-        meta: {title: '计划进度 (移动版) - 智能膳食系统'}
-    },
-    {
-        path: '/meal-planner',
-        name: 'MealPlanner',
-        component: () => import('../views/FamilyMealPlanner.vue'),
-        meta: {title: '家庭配餐 - 智能膳食系统'}
-    },
-    {
         path: '/profile/personal',
+        name: 'ProfileList',
+        component: () => import('../views/ProfileList.vue'),
+        meta: {title: '健康档案管理 - 智能膳食系统'}
+    },
+    {
+        path: '/profile/personal-detail',
         name: 'PersonalProfile',
         component: () => import('../views/PersonalProfile.vue'),
-        meta: {title: '个人档案 - 智能膳食系统'}
+        meta: {title: '成员健康评估详情 - 智能膳食系统'}
     },
     {
         path: '/profile/family',
         name: 'FamilyProfile',
         component: () => import('../views/FamilyManagement.vue'),
         meta: {title: '家庭档案 - 智能膳食系统'}
-    },
-    {
-        path: '/dishes',
-        name: 'Dishes',
-        component: () => import('../views/DishLibrary.vue'),
-        meta: {title: '菜谱广场 - 智能膳食系统'}
     },
     {
         path: '/dish-manage',
@@ -64,12 +46,6 @@ const routes = [
         name: 'CookingStepManage',
         component: () => import('../views/CookingStepManage.vue'),
         meta: {title: '烹饪步骤 - 智能膳食系统'}
-    },
-    {
-        path: '/weight',
-        name: 'Weight',
-        component: () => import('../views/WeightTracker.vue'),
-        meta: {title: '体重记录 - 智能膳食系统'}
     },
     {
         path: '/system-setting',

@@ -3,26 +3,29 @@ package com.diet.modules.biz.model.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.diet.modules.common.entity.BaseEntity;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 @TableName("diet_weight_record")
-public class DietWeightRecord {
+@Schema(description = "成员体重记录历史实体类")
+public class DietWeightRecord extends BaseEntity {
     @TableId(type = IdType.AUTO)
+    @Schema(description = "recordId")
     private Long recordId;
-    private Long profileId; // 对应 user_health_profile.profile_id
+    @Schema(description = "对应 user_health_profile.profile_id")
+    private Long profileId;
+    @Schema(description = "recordWeight")
     private BigDecimal recordWeight;
+    @Schema(description = "记录日期")
     private LocalDate recordDate;
-    private Long planProgressId; // 关联执行计划进度ID (0为日常测重)
+    @Schema(description = "关联执行计划进度ID (0为日常测重)")
+    private Long planProgressId;
 
-    // 审计字段
-    private Integer delFlag;
-    private String createBy;
-    private String updateBy;
-    private LocalDateTime createTime;
-    private LocalDateTime updateTime;
 }

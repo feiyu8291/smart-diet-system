@@ -1,6 +1,8 @@
 package com.diet.modules.biz.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.diet.modules.biz.model.entity.DietFamilyGroup;
+import com.diet.modules.biz.model.po.DietFamilyGroupQueryPO;
 import com.diet.modules.biz.service.DietFamilyGroupService;
 import com.diet.modules.common.entity.Result;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,9 +29,16 @@ public class DietFamilyGroupController {
 
     @Operation(summary = "查询家庭分组列表")
     @GetMapping("/list")
-    public Result<List<DietFamilyGroup>> list(@RequestParam Long userId) {
+    public Result<List<DietFamilyGroup>> list(@RequestParam(required = false) Long userId) {
         List<DietFamilyGroup> list = familyGroupService.listGroups(userId);
         return Result.success(list);
+    }
+
+    @Operation(summary = "家庭分组分页查询")
+    @GetMapping("/page")
+    public Result<IPage<DietFamilyGroup>> page(DietFamilyGroupQueryPO po) {
+        IPage<DietFamilyGroup> pageResult = familyGroupService.pageGroups(po);
+        return Result.success(pageResult);
     }
 
     @Operation(summary = "保存/修改家庭分组")

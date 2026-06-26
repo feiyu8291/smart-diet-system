@@ -2,13 +2,13 @@ package com.diet.modules.biz.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.diet.modules.biz.config.S3Config;
 import com.diet.modules.biz.mapper.DietUserDishImageMapper;
 import com.diet.modules.biz.model.entity.DietUserDishImage;
+import com.diet.modules.common.config.AmzS3Config;
 import com.diet.modules.common.enums.BucketEnum;
 import com.diet.modules.system.mapper.SysFileStorageMapper;
 import com.diet.modules.system.model.entity.SysFileStorage;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,16 +29,12 @@ import java.util.UUID;
  * @date 2026-06-20
  */
 @Service
+@RequiredArgsConstructor
 public class DietFileStorageService extends ServiceImpl<SysFileStorageMapper, SysFileStorage> {
 
-    @Autowired
-    private S3Client s3Client;
-
-    @Autowired
-    private S3Config s3Config;
-
-    @Autowired
-    private DietUserDishImageMapper userDishImageMapper;
+    private final S3Client s3Client;
+    private final AmzS3Config amzS3Config;
+    private final DietUserDishImageMapper userDishImageMapper;
 
     @Transactional(rollbackFor = Exception.class)
     public String uploadDishImage(MultipartFile file, Long groupId, Long dishId, String creator) {
@@ -69,7 +65,7 @@ public class DietFileStorageService extends ServiceImpl<SysFileStorageMapper, Sy
             throw new RuntimeException("读取上传文件流失败", e);
         }
 
-        String endpoint = s3Config.getEndpoint();
+        String endpoint = amzS3Config.getEndPoint();
         if (!endpoint.endsWith("/")) {
             endpoint += "/";
         }

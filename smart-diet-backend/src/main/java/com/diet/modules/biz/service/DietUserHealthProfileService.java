@@ -2,11 +2,13 @@ package com.diet.modules.biz.service;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.diet.modules.biz.mapper.DietUserHealthProfileMapper;
 import com.diet.modules.biz.model.dto.DietUserHealthProfileDTO;
-import com.diet.modules.biz.model.vo.DietUserHealthProfileVO;
 import com.diet.modules.biz.model.entity.DietUserHealthProfile;
+import com.diet.modules.biz.model.po.DietUserHealthProfileQueryPO;
+import com.diet.modules.biz.model.vo.DietUserHealthProfileVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +16,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
+// ... (此处省略中间其它代码以防匹配错误，但 replace_file_content 替换时我们需要提供完整的替换区间)
 
 /**
  * 成员健康档案服务类
@@ -29,13 +32,13 @@ public class DietUserHealthProfileService extends ServiceImpl<DietUserHealthProf
      */
     public void calculateHealthMetrics(DietUserHealthProfile profile) {
         if (profile == null || profile.getMemberWeight() == null || profile.getMemberHeight() == null
-                || profile.getMemberAge() == null || profile.getMemberGender() == null) {
+                || profile.getMemberBirthday() == null || profile.getMemberGender() == null) {
             return;
         }
 
         double weight = profile.getMemberWeight().doubleValue();
         double height = profile.getMemberHeight().doubleValue();
-        int age = profile.getMemberAge();
+        int age = java.time.Period.between(profile.getMemberBirthday(), java.time.LocalDate.now()).getYears();
         int gender = profile.getMemberGender();
 
         // 1. 计算基础代谢率 (BMR) - Harris-Benedict 公式
@@ -101,8 +104,10 @@ public class DietUserHealthProfileService extends ServiceImpl<DietUserHealthProf
      */
     public List<DietUserHealthProfile> getProfilesByGroupId(Long groupId) {
         LambdaQueryWrapper<DietUserHealthProfile> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(DietUserHealthProfile::getGroupId, groupId)
-                .eq(DietUserHealthProfile::getDelFlag, 0);
+        if (groupId != null) {
+            wrapper.eq(DietUserHealthProfile::getGroupId, groupId);
+        }
+        wrapper.eq(DietUserHealthProfile::getDelFlag, 0);
         return list(wrapper);
     }
 
@@ -114,6 +119,9 @@ public class DietUserHealthProfileService extends ServiceImpl<DietUserHealthProf
         return list.stream().map(entity -> {
             DietUserHealthProfileVO vo = new DietUserHealthProfileVO();
             BeanUtil.copyProperties(entity, vo);
+            if (entity.getMemberBirthday() != null) {
+                vo.setMemberAge(java.time.Period.between(entity.getMemberBirthday(), java.time.LocalDate.now()).getYears());
+            }
             return vo;
         }).toList();
     }
@@ -153,5 +161,45 @@ public class DietUserHealthProfileService extends ServiceImpl<DietUserHealthProf
             return this.updateById(profile);
         }
         return false;
+    }
+
+    /**
+     * 获取成员档案分页列表，并转化为 VO 响应
+     */
+    public IPage<DietUserHealthProfileVO> pageProfiles(DietUserHealthProfileQueryPO po) {
+        if (po == null) {
+            po = new DietUserHealthProfileQueryPO();
+        }
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<DietUserHealthProfile> page =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(po.getPageNo(), po.getPageSize());
+
+        LambdaQueryWrapper<DietUserHealthProfile> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DietUserHealthProfile::getDelFlag, 0);
+        if (po.getGroupId() != null) {
+            wrapper.eq(DietUserHealthProfile::getGroupId, po.getGroupId());
+        }
+        if (po.getName() != null && !po.getName().trim().isEmpty()) {
+            wrapper.like(DietUserHealthProfile::getMemberName, po.getName().trim());
+        }
+        wrapper.orderByDesc(DietUserHealthProfile::getProfileId);
+
+        IPage<DietUserHealthProfile> entityPage = this.page(page, wrapper);
+
+        // 转换成 VO Page
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<DietUserHealthProfileVO> voPage =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(entityPage.getCurrent(), entityPage.getSize(),
+                        entityPage.getTotal());
+
+        java.util.List<DietUserHealthProfileVO> voList = entityPage.getRecords().stream().map(entity -> {
+            DietUserHealthProfileVO vo = new DietUserHealthProfileVO();
+            BeanUtil.copyProperties(entity, vo);
+            if (entity.getMemberBirthday() != null) {
+                vo.setMemberAge(java.time.Period.between(entity.getMemberBirthday(), java.time.LocalDate.now()).getYears());
+            }
+            return vo;
+        }).toList();
+
+        voPage.setRecords(voList);
+        return voPage;
     }
 }

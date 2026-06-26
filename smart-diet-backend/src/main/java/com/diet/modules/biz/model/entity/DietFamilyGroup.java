@@ -3,23 +3,25 @@ package com.diet.modules.biz.model.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.diet.modules.common.entity.BaseEntity;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 @TableName("diet_family_group")
-public class DietFamilyGroup {
+@Schema(description = "家庭组档案实体类")
+public class DietFamilyGroup extends BaseEntity {
     @TableId(type = IdType.AUTO)
+    @Schema(description = "家庭组ID")
     private Long groupId;
+    @Schema(description = "groupName")
     private String groupName;
+    @Schema(description = "creatorUserId")
     private Long creatorUserId;
+    @Schema(description = "cooldownDays")
     private Integer cooldownDays;
 
-    // 审计字段
-    private Integer delFlag;
-    private String createBy;
-    private String updateBy;
-    private LocalDateTime createTime;
-    private LocalDateTime updateTime;
 }

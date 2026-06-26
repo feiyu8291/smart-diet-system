@@ -3,7 +3,7 @@ package com.diet.modules.biz.controller;
 import com.diet.modules.biz.service.DietFileStorageService;
 import com.diet.modules.common.entity.Result;
 import com.diet.modules.common.exception.BusinessException;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,10 +16,10 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/file")
 @CrossOrigin(origins = "*")
+@RequiredArgsConstructor
 public class DietFileController {
 
-    @Autowired
-    private DietFileStorageService fileStorageService;
+    private final DietFileStorageService fileStorageService;
 
     @PostMapping("/upload")
     public Result<String> uploadFile(@RequestParam("file") MultipartFile file,

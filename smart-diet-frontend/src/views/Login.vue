@@ -150,7 +150,7 @@ const handleLogin = async () => {
         console.error('获取权限菜单失败', e)
       }
 
-      router.push('/dashboard')
+      router.push('/profile/personal')
     } else {
       ElMessage.error('登录失败，未获取到有效 Token')
     }

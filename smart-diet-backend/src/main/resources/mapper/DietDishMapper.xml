@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.diet.modules.biz.mapper.DietDishMapper">
+
+    <select id="selectDishPage" resultType="com.diet.modules.biz.model.vo.DietDishVO">
+        SELECT
+            d.dish_id AS dishId,
+            b.branch_id AS branchId,
+            b.branch_name AS branchName,
+            d.dish_name AS dishName,
+            b.cuisine_type AS cuisineType,
+            b.diet_mode AS dietMode,
+            b.calories,
+            b.protein,
+            b.fat,
+            b.carbs,
+            COALESCE(ufs.file_path, dfs.file_path) AS previewUrl,
+            COALESCE(s.cook_count, 0) AS cookCount,
+            COALESCE(s.signature_flag, 0) AS signatureFlag,
+            CASE WHEN sk.relation_id IS NOT NULL THEN 1 ELSE 0 END AS isSkilled
+        FROM diet_dish_cooking_branch b
+        INNER JOIN diet_dish d ON b.dish_id = d.dish_id AND d.del_flag = 0
+        <!-- 关联做饭人菜品统计信息 -->
+        LEFT JOIN diet_cook_dish_stat s ON s.dish_id = b.dish_id 
+            AND s.user_id = #{po.userId} 
+            AND s.del_flag = 0
+        <!-- 关联做饭人拿手菜标记 -->
+        LEFT JOIN diet_cook_skilled_dish sk ON sk.dish_id = b.dish_id 
+            AND sk.user_id = #{po.userId} 
+            AND sk.del_flag = 0
+        <!-- 关联家庭组自制成品图关系 -->
+        LEFT JOIN diet_user_dish_image uimg ON uimg.dish_id = b.dish_id 
+            AND uimg.group_id = #{po.groupId} 
+            AND uimg.del_flag = 0
+        <!-- 关联自制成品图存储路径 -->
+        LEFT JOIN sys_file_storage ufs ON ufs.storage_id = uimg.storage_id 
+            AND ufs.del_flag = 0
+        <!-- 关联菜品默认覆盖图存储路径 -->
+        LEFT JOIN sys_file_storage dfs ON dfs.storage_id = d.cover_image_id 
+            AND dfs.del_flag = 0
+        WHERE b.del_flag = 0
+        <if test="po.dishName != null and po.dishName.trim() != ''">
+            AND d.dish_name LIKE CONCAT('%', #{po.dishName}, '%')
+        </if>
+        <if test="po.cuisineType != null and po.cuisineType.trim() != ''">
+            AND b.cuisine_type = #{po.cuisineType}
+        </if>
+        <if test="po.dietMode != null">
+            AND b.diet_mode = #{po.dietMode}
+        </if>
+        ORDER BY b.create_time DESC
+    </select>
+
+</mapper>

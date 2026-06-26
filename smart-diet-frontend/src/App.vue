@@ -9,79 +9,7 @@
 
       <!-- 垂直导航菜单 (分组二级树状结构) -->
       <nav class="sidebar-nav-menu">
-        <!-- 分组 1: 健康分析 -->
-        <div class="menu-group">
-          <div class="group-header" @click="toggleGroup('analysis')">
-            <span class="group-icon">⬡</span>
-            <span class="group-title">健康分析</span>
-            <span class="group-arrow" :class="{ 'collapsed': !expandedGroups.analysis }">▾</span>
-          </div>
-          <div v-show="expandedGroups.analysis" class="sub-menu-list">
-            <router-link
-                to="/dashboard"
-                custom
-                v-slot="{ navigate, isActive }"
-            >
-              <button
-                  :class="['sub-menu-btn', isActive ? 'active' : '']"
-                  @click="navigate"
-              >
-                计划进度
-              </button>
-            </router-link>
-
-            <router-link
-                to="/weight"
-                custom
-                v-slot="{ navigate, isActive }"
-            >
-              <button
-                  :class="['sub-menu-btn', isActive ? 'active' : '']"
-                  @click="navigate"
-              >
-                体重追踪
-              </button>
-            </router-link>
-          </div>
-        </div>
-
-        <!-- 分组 2: 膳食计划 -->
-        <div class="menu-group">
-          <div class="group-header" @click="toggleGroup('diet')">
-            <span class="group-icon">✦</span>
-            <span class="group-title">膳食管理</span>
-            <span class="group-arrow" :class="{ 'collapsed': !expandedGroups.diet }">▾</span>
-          </div>
-          <div v-show="expandedGroups.diet" class="sub-menu-list">
-            <router-link
-                to="/meal-planner"
-                custom
-                v-slot="{ navigate, isActive }"
-            >
-              <button
-                  :class="['sub-menu-btn', isActive ? 'active' : '']"
-                  @click="navigate"
-              >
-                联合配餐
-              </button>
-            </router-link>
-
-            <router-link
-                to="/dishes"
-                custom
-                v-slot="{ navigate, isActive }"
-            >
-              <button
-                  :class="['sub-menu-btn', isActive ? 'active' : '']"
-                  @click="navigate"
-              >
-                菜谱广场
-              </button>
-            </router-link>
-          </div>
-        </div>
-
-        <!-- 分组 2.5: 菜谱库管理 -->
+        <!-- 分组 1: 菜谱库管理 -->
         <div class="menu-group">
           <div class="group-header" @click="toggleGroup('recipeLibrary')">
             <span class="group-icon">📖</span>
@@ -130,7 +58,7 @@
           </div>
         </div>
 
-        <!-- 分组 3: 档案管理 -->
+        <!-- 分组 2: 档案管理 -->
         <div class="menu-group">
           <div class="group-header" @click="toggleGroup('profile')">
             <span class="group-icon">🗂</span>
@@ -147,7 +75,7 @@
                   :class="['sub-menu-btn', isActive ? 'active' : '']"
                   @click="navigate"
               >
-                个人档案
+                成员健康档案
               </button>
             </router-link>
 
@@ -160,7 +88,7 @@
                   :class="['sub-menu-btn', isActive ? 'active' : '']"
                   @click="navigate"
               >
-                家庭档案
+                家庭组档案
               </button>
             </router-link>
           </div>
@@ -287,18 +215,18 @@
       <template v-if="!isNavHidden">
         <div class="marquee-strip">
           <div class="marquee-content">
-            <span class="eyebrow">◆ BMI MANAGEMENT</span>
-            <span class="eyebrow">◆ BMR测评</span>
-            <span class="eyebrow">◆ TDEE等比分餐</span>
+            <span class="eyebrow">◆ 菜谱库管理</span>
+            <span class="eyebrow">◆ 原材料管理</span>
+            <span class="eyebrow">◆ 烹饪工序规范</span>
             <span class="eyebrow">◆ MINIO 存储</span>
             <span class="eyebrow">◆ 菜系配置避重</span>
-            <span class="eyebrow">◆ 拿手菜培养</span>
-            <span class="eyebrow">◆ BMI MANAGEMENT</span>
-            <span class="eyebrow">◆ BMR测评</span>
-            <span class="eyebrow">◆ TDEE等比分餐</span>
+            <span class="eyebrow">◆ 成员健康档案</span>
+            <span class="eyebrow">◆ 家庭组管理</span>
+            <span class="eyebrow">◆ 菜谱库管理</span>
+            <span class="eyebrow">◆ 原材料管理</span>
+            <span class="eyebrow">◆ 烹饪工序规范</span>
             <span class="eyebrow">◆ MINIO 存储</span>
-            <span class="eyebrow">◆ 菜系配置避重</span>
-            <span class="eyebrow">◆ 拿手菜培养</span>
+            <span class="eyebrow">◆ 成员健康档案</span>
           </div>
         </div>
       </template>
@@ -309,7 +237,7 @@
       </main>
 
       <!-- 页脚 (footer) -->
-      <footer class="bottom-footer hairline-border">
+      <footer v-if="showFooter" class="bottom-footer hairline-border">
         <div class="footer-container">
           <div class="footer-brand">
             <h2 class="display-lg">SmartDiet</h2>
@@ -345,6 +273,12 @@ import {useRoute, useRouter} from 'vue-router'
 const router = useRouter()
 const route = useRoute()
 
+// 隐藏页脚的路由（管理页面及移动端页面）
+const showFooter = computed(() => {
+  const hidePaths = ['/login', '/dish-manage', '/ingredients', '/cooking-steps', '/system-setting', '/profile/family', '/profile/personal']
+  return !hidePaths.some(path => route.path === path || route.path.startsWith(path + '/')) && !route.path.startsWith('/m/')
+})
+
 // 全局共享家庭组 ID
 const currentGroupId = ref(1)
 
@@ -364,14 +298,12 @@ const isNavHidden = computed(() => {
 
 // 折叠导航菜单控制
 const expandedGroups = ref<Record<string, boolean>>({
-  analysis: true,
-  diet: true,
   recipeLibrary: true,
   profile: true,
   system: true
 })
 
-const toggleGroup = (group: 'analysis' | 'diet' | 'recipeLibrary' | 'profile' | 'system') => {
+const toggleGroup = (group: 'recipeLibrary' | 'profile' | 'system') => {
   expandedGroups.value[group] = !expandedGroups.value[group]
 }
 

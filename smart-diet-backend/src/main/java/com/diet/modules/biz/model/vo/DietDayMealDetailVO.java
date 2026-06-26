@@ -1,5 +1,6 @@
 package com.diet.modules.biz.model.vo;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.util.List;
@@ -11,29 +12,20 @@ import java.util.List;
  * @date 2026-06-21
  */
 @Data
+@Schema(description = "日配餐整体详情视图对象")
 public class DietDayMealDetailVO {
-    /**
-     * 本日是否有配餐
-     */
+    @Schema(description = "本日是否有配餐")
     private Boolean hasMeal;
 
-    /**
-     * 早餐详情
-     */
+    @Schema(description = "早餐详情")
     private DietMealDetailVO breakfast;
 
-    /**
-     * 午餐详情
-     */
+    @Schema(description = "午餐详情")
     private DietMealDetailVO lunch;
 
-    /**
-     * 晚餐详情
-     */
+    @Schema(description = "晚餐详情")
     private DietMealDetailVO dinner;
 
-    /**
-     * 合并后的全天食材采购总清单
-     */
+    @Schema(description = "合并后的全天食材采购总清单")
     private List<DietGroceryVO> dailyGroceries;
 }

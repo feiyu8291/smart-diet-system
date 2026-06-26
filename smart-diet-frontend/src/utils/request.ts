@@ -28,7 +28,7 @@ request.interceptors.response.use(
             if (res.code === 200) {
                 // 兼容迁移过来的系统管理模块，其请求前缀是 /sys、/api/s3Storage 或 /api/auth
                 const url = response.config.url || ''
-                if (url.startsWith('/sys') || url.startsWith('/api/s3Storage') || url.startsWith('/api/auth')) {
+                if (url.startsWith('/sys') || url.startsWith('/api/s3Storage') || url.startsWith('/api/auth') || url.includes('/page')) {
                     return res
                 }
                 return res.data

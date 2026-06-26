@@ -2,19 +2,18 @@ package com.diet.modules.biz.service;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.diet.modules.biz.mapper.*;
-import com.diet.modules.biz.model.dto.DietDislikeDTO;
-import com.diet.modules.biz.model.dto.DietSkilledDTO;
-import com.diet.modules.biz.model.dto.DietWishDTO;
+import com.diet.modules.biz.model.dto.*;
 import com.diet.modules.biz.model.entity.*;
 import com.diet.modules.biz.model.po.DietDishQueryPO;
-import com.diet.modules.biz.model.vo.DietDishDetailVO;
-import com.diet.modules.biz.model.vo.DietDishIngredientVO;
-import com.diet.modules.biz.model.vo.DietDishStepVO;
-import com.diet.modules.biz.model.vo.DietDishVO;
+import com.diet.modules.biz.model.vo.*;
+import com.diet.modules.common.aspect.DictData;
 import com.diet.modules.system.mapper.SysFileStorageMapper;
 import com.diet.modules.system.model.entity.SysFileStorage;
+import com.diet.modules.system.service.SysDataDictionaryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -49,6 +48,8 @@ public class DietDishService extends ServiceImpl<DietDishMapper, DietDish> {
     private final DietUserDislikeDishMapper userDislikeDishMapper;
     private final DietUserDishImageMapper userDishImageMapper;
     private final SysFileStorageMapper sysFileStorageMapper;
+    private final SysDataDictionaryService sysDataDictionaryService;
+    private final DietDishCookingBranchMapper dishCookingBranchMapper;
 
     /**
      * 获取所有有效的菜谱及对应的熟练度与图片
@@ -119,6 +120,34 @@ public class DietDishService extends ServiceImpl<DietDishMapper, DietDish> {
     }
 
     /**
+     * 分页查询菜谱列表及做饭人统计信息
+     */
+    @DictData
+    public IPage<DietDishVO> pageDishes(DietDishQueryPO po) {
+        Page<DietDishVO> page = new Page<>(po.getPageNo(), po.getPageSize());
+        IPage<DietDishVO> result = dishMapper.selectDishPage(page, po);
+        List<DietDishVO> records = result.getRecords();
+        if (records != null && !records.isEmpty()) {
+            for (DietDishVO vo : records) {
+                // 为了兼容前端列表做法Tag的渲染，为其组装只包含当前分支自身的单元素列表
+                List<DietDishBranchVO> branchVOList = new ArrayList<>();
+                DietDishBranchVO branchVO = new DietDishBranchVO();
+                branchVO.setBranchId(vo.getBranchId());
+                branchVO.setBranchName(vo.getBranchName());
+                branchVO.setCuisineType(vo.getCuisineType());
+                branchVO.setDietMode(vo.getDietMode() != null ? Integer.parseInt(vo.getDietMode()) : 0);
+                branchVO.setCalories(vo.getCalories() != null ? BigDecimal.valueOf(vo.getCalories()) : BigDecimal.ZERO);
+                branchVO.setProtein(vo.getProtein());
+                branchVO.setFat(vo.getFat());
+                branchVO.setCarbs(vo.getCarbs());
+                branchVOList.add(branchVO);
+                vo.setBranches(branchVOList);
+            }
+        }
+        return result;
+    }
+
+    /**
      * 获取指定菜谱的详情信息 (配料原料列表和做法步骤列表)
      */
     public DietDishDetailVO getDishDetail(Long dishId) {
@@ -130,51 +159,131 @@ public class DietDishService extends ServiceImpl<DietDishMapper, DietDish> {
         DietDishDetailVO detailVO = new DietDishDetailVO();
         detailVO.setDish(dish);
 
-        // 1. 获取配方原料列表 (dish_ingredient)
-        LambdaQueryWrapper<DietDishIngredient> ingredQuery = new LambdaQueryWrapper<>();
-        ingredQuery.eq(DietDishIngredient::getDishId, dishId).eq(DietDishIngredient::getDelFlag, 0);
-        List<DietDishIngredient> rels = dishIngredientMapper.selectList(ingredQuery);
+        // 查找该菜品所有有效的做法分支
+        LambdaQueryWrapper<DietDishCookingBranch> branchQuery = new LambdaQueryWrapper<>();
+        branchQuery.eq(DietDishCookingBranch::getDishId, dishId).eq(DietDishCookingBranch::getDelFlag, 0);
+        List<DietDishCookingBranch> branches = dishCookingBranchMapper.selectList(branchQuery);
 
-        List<DietDishIngredientVO> ingredients = new ArrayList<>();
-        for (DietDishIngredient rel : rels) {
-            DietDishIngredientVO item = new DietDishIngredientVO();
-            item.setRelationId(rel.getRelationId());
-            item.setUseAmount(rel.getUseAmount() != null ? rel.getUseAmount().toString() : null);
-            item.setMainMaterialFlag(rel.getMainMaterialFlag());
+        // 如果做法分支为空，为向下兼容，自动创建一个默认分支并将原有关联的数据绑定到该分支上
+        if (branches.isEmpty()) {
+            DietDishCookingBranch defaultBranch = new DietDishCookingBranch();
+            defaultBranch.setDishId(dishId);
+            defaultBranch.setBranchName("经典做法");
+            defaultBranch.setCuisineType("粤菜");
+            defaultBranch.setDietMode(0);
+            defaultBranch.setCalories(BigDecimal.ZERO);
+            defaultBranch.setProtein(BigDecimal.ZERO);
+            defaultBranch.setFat(BigDecimal.ZERO);
+            defaultBranch.setCarbs(BigDecimal.ZERO);
+            defaultBranch.setDelFlag(0);
+            defaultBranch.setCreateTime(LocalDateTime.now());
+            defaultBranch.setUpdateTime(LocalDateTime.now());
+            dishCookingBranchMapper.insert(defaultBranch);
 
-            DietIngredient ing = ingredientMapper.selectById(rel.getIngredientId());
-            if (ing != null) {
-                item.setIngredientId(ing.getIngredientId());
-                item.setIngredientName(ing.getIngredientName());
-                item.setMeasureUnit(ing.getMeasureUnit());
-            }
-            ingredients.add(item);
+            Long defaultBranchId = defaultBranch.getBranchId();
+
+            // 绑定已有的原料和步骤关联关系到此做法分支上
+            DietDishIngredient updateIng = new DietDishIngredient();
+            updateIng.setBranchId(defaultBranchId);
+            LambdaQueryWrapper<DietDishIngredient> ingUpdateWrapper = new LambdaQueryWrapper<>();
+            ingUpdateWrapper.eq(DietDishIngredient::getDishId, dishId);
+            dishIngredientMapper.update(updateIng, ingUpdateWrapper);
+
+            DietDishStepRelation updateStep = new DietDishStepRelation();
+            updateStep.setBranchId(defaultBranchId);
+            LambdaQueryWrapper<DietDishStepRelation> stepUpdateWrapper = new LambdaQueryWrapper<>();
+            stepUpdateWrapper.eq(DietDishStepRelation::getDishId, dishId);
+            dishStepRelationMapper.update(updateStep, stepUpdateWrapper);
+
+            branches = Collections.singletonList(defaultBranch);
         }
-        detailVO.setIngredients(ingredients);
 
-        // 2. 获取做法步骤列表 (dish_step_relation)
-        LambdaQueryWrapper<DietDishStepRelation> stepQuery = new LambdaQueryWrapper<>();
-        stepQuery.eq(DietDishStepRelation::getDishId, dishId)
-                .eq(DietDishStepRelation::getDelFlag, 0)
-                .orderByAsc(DietDishStepRelation::getStepNum);
-        List<DietDishStepRelation> stepRels = dishStepRelationMapper.selectList(stepQuery);
-
-        List<DietDishStepVO> steps = new ArrayList<>();
-        for (DietDishStepRelation rel : stepRels) {
-            DietDishStepVO item = new DietDishStepVO();
-            item.setStepNum(rel.getStepNum());
-
-            String detail = rel.getCustomDetail();
-            if (detail == null || detail.trim().isEmpty()) {
-                DietCookingStepPool pool = cookingStepPoolMapper.selectById(rel.getStepPoolId());
-                if (pool != null) {
-                    detail = pool.getStepDetail();
+        List<DietDishBranchVO> branchVOList = new ArrayList<>();
+        for (DietDishCookingBranch branch : branches) {
+            DietDishBranchVO branchVO = new DietDishBranchVO();
+            branchVO.setBranchId(branch.getBranchId());
+            branchVO.setBranchName(branch.getBranchName());
+            branchVO.setCuisineType(branch.getCuisineType());
+            branchVO.setDietMode(branch.getDietMode());
+            branchVO.setCalories(branch.getCalories());
+            branchVO.setProtein(branch.getProtein());
+            branchVO.setFat(branch.getFat());
+            branchVO.setCarbs(branch.getCarbs());
+            branchVO.setCoverImageId(branch.getCoverImageId());
+            String previewUrl = null;
+            if (branch.getCoverImageId() != null) {
+                SysFileStorage img = sysFileStorageMapper.selectById(branch.getCoverImageId());
+                if (img != null && img.getDelFlag() == 0) {
+                    previewUrl = img.getFilePath();
                 }
             }
-            item.setStepDetail(detail);
-            steps.add(item);
+            branchVO.setPreviewUrl(previewUrl);
+
+            // 1. 获取配方原料列表 (dish_ingredient)
+            LambdaQueryWrapper<DietDishIngredient> ingredQuery = new LambdaQueryWrapper<>();
+            ingredQuery.eq(DietDishIngredient::getDishId, dishId)
+                    .eq(DietDishIngredient::getBranchId, branch.getBranchId())
+                    .eq(DietDishIngredient::getDelFlag, 0);
+            List<DietDishIngredient> rels = dishIngredientMapper.selectList(ingredQuery);
+
+            List<DietDishIngredientVO> ingredients = new ArrayList<>();
+            for (DietDishIngredient rel : rels) {
+                DietDishIngredientVO item = new DietDishIngredientVO();
+                item.setRelationId(rel.getRelationId());
+                item.setUseAmount(rel.getUseAmount() != null ? rel.getUseAmount().toString() : null);
+                item.setMainMaterialFlag(rel.getMainMaterialFlag());
+
+                DietIngredient ing = ingredientMapper.selectById(rel.getIngredientId());
+                if (ing != null) {
+                    item.setIngredientId(ing.getIngredientId());
+                    item.setIngredientName(ing.getIngredientName());
+                    item.setMeasureUnit(ing.getMeasureUnit());
+                }
+                ingredients.add(item);
+            }
+            branchVO.setIngredients(ingredients);
+
+            // 2. 获取做法步骤列表 (dish_step_relation)
+            LambdaQueryWrapper<DietDishStepRelation> stepQuery = new LambdaQueryWrapper<>();
+            stepQuery.eq(DietDishStepRelation::getDishId, dishId)
+                    .eq(DietDishStepRelation::getBranchId, branch.getBranchId())
+                    .eq(DietDishStepRelation::getDelFlag, 0)
+                    .orderByAsc(DietDishStepRelation::getStepNum);
+            List<DietDishStepRelation> stepRels = dishStepRelationMapper.selectList(stepQuery);
+
+            List<DietDishStepVO> steps = new ArrayList<>();
+            for (DietDishStepRelation rel : stepRels) {
+                DietDishStepVO item = new DietDishStepVO();
+                item.setStepNum(rel.getStepNum());
+
+                String detail = rel.getCustomDetail();
+                if (detail == null || detail.trim().isEmpty()) {
+                    DietCookingStepPool pool = cookingStepPoolMapper.selectById(rel.getStepPoolId());
+                    if (pool != null) {
+                        detail = pool.getStepDetail();
+                    }
+                }
+                item.setStepDetail(detail);
+                item.setDurationSeconds(rel.getDurationSeconds());
+                item.setFirePower(rel.getFirePower());
+                if (rel.getFirePower() != null) {
+                    item.setFirePowerLabel(sysDataDictionaryService.selectValueByTypeAndCode("fire_power_type", rel.getFirePower().toString()));
+                } else {
+                    item.setFirePowerLabel("");
+                }
+                steps.add(item);
+            }
+            branchVO.setSteps(steps);
+
+            branchVOList.add(branchVO);
         }
-        detailVO.setSteps(steps);
+        detailVO.setBranches(branchVOList);
+
+        // 为了老版本的接口调用向下兼容，根级结构默认填入首个做法分支的数据
+        if (!branchVOList.isEmpty()) {
+            detailVO.setIngredients(branchVOList.get(0).getIngredients());
+            detailVO.setSteps(branchVOList.get(0).getSteps());
+        }
 
         return detailVO;
     }
@@ -287,77 +396,8 @@ public class DietDishService extends ServiceImpl<DietDishMapper, DietDish> {
         }
 
         dish.setDishName(dto.getDishName());
-        dish.setCuisineType(dto.getCuisineType());
-        dish.setDietMode(dto.getDietMode() != null ? dto.getDietMode() : 0);
-        dish.setImageIds(dto.getImageIds());
-
-        // 提取 imageIds 中的第一张图片 ID 作为 coverImageId，以向下兼容
-        if (dto.getImageIds() != null && !dto.getImageIds().trim().isEmpty()) {
-            String[] ids = dto.getImageIds().split(",");
-            if (ids.length > 0 && !ids[0].trim().isEmpty()) {
-                try {
-                    dish.setCoverImageId(Long.parseLong(ids[0].trim()));
-                } catch (NumberFormatException e) {
-                    dish.setCoverImageId(dto.getCoverImageId());
-                }
-            } else {
-                dish.setCoverImageId(dto.getCoverImageId());
-            }
-        } else {
-            dish.setCoverImageId(dto.getCoverImageId());
-        }
-
+        dish.setCoverImageId(dto.getCoverImageId());
         dish.setUpdateTime(LocalDateTime.now());
-
-        // 2. 智能核算热量与三大营养素
-        // 如果传入了大于0的具体值，优先使用传入值；否则从配料中重算每100克成品菜的营养素
-        boolean needsCalc = (dto.getCalories() == null || dto.getCalories().doubleValue() <= 0);
-
-        if (!needsCalc) {
-            dish.setCalories(dto.getCalories());
-            dish.setProtein(dto.getProtein() != null ? dto.getProtein() : BigDecimal.ZERO);
-            dish.setFat(dto.getFat() != null ? dto.getFat() : BigDecimal.ZERO);
-            dish.setCarbs(dto.getCarbs() != null ? dto.getCarbs() : BigDecimal.ZERO);
-        } else {
-            // 根据配料表进行计算
-            if (dto.getIngredients() == null || dto.getIngredients().isEmpty()) {
-                dish.setCalories(BigDecimal.ZERO);
-                dish.setProtein(BigDecimal.ZERO);
-                dish.setFat(BigDecimal.ZERO);
-                dish.setCarbs(BigDecimal.ZERO);
-            } else {
-                double totalWeight = 0;
-                double totalCals = 0;
-                double totalProt = 0;
-                double totalFat = 0;
-                double totalCarbs = 0;
-
-                for (com.diet.modules.biz.model.dto.DietDishIngredientSaveDTO ingDto : dto.getIngredients()) {
-                    DietIngredient ing = ingredientMapper.selectById(ingDto.getIngredientId());
-                    if (ing != null && ing.getDelFlag() == 0 && ingDto.getUseAmount() != null) {
-                        double weight = ingDto.getUseAmount().doubleValue();
-                        totalWeight += weight;
-                        totalCals += (ing.getCalories().doubleValue() * weight) / 100.0;
-                        totalProt += (ing.getProtein().doubleValue() * weight) / 100.0;
-                        totalFat += (ing.getFat().doubleValue() * weight) / 100.0;
-                        totalCarbs += (ing.getCarbs().doubleValue() * weight) / 100.0;
-                    }
-                }
-
-                if (totalWeight > 0) {
-                    // 折算为每 100 克成品的营养素
-                    dish.setCalories(BigDecimal.valueOf((totalCals / totalWeight) * 100.0).setScale(2, RoundingMode.HALF_UP));
-                    dish.setProtein(BigDecimal.valueOf((totalProt / totalWeight) * 100.0).setScale(2, RoundingMode.HALF_UP));
-                    dish.setFat(BigDecimal.valueOf((totalFat / totalWeight) * 100.0).setScale(2, RoundingMode.HALF_UP));
-                    dish.setCarbs(BigDecimal.valueOf((totalCarbs / totalWeight) * 100.0).setScale(2, RoundingMode.HALF_UP));
-                } else {
-                    dish.setCalories(BigDecimal.ZERO);
-                    dish.setProtein(BigDecimal.ZERO);
-                    dish.setFat(BigDecimal.ZERO);
-                    dish.setCarbs(BigDecimal.ZERO);
-                }
-            }
-        }
 
         // 保存或修改主表
         if (dto.getDishId() != null) {
@@ -367,46 +407,215 @@ public class DietDishService extends ServiceImpl<DietDishMapper, DietDish> {
         }
         Long dishId = dish.getDishId();
 
-        // 3. 清理已有的配料与步骤关联
-        LambdaQueryWrapper<DietDishIngredient> ingDelete = new LambdaQueryWrapper<>();
-        ingDelete.eq(DietDishIngredient::getDishId, dishId);
-        dishIngredientMapper.delete(ingDelete);
+        // 2. 解析分支做法数据（如果 branches 为空，默认创建一个做法分支）
+        List<DietDishBranchSaveDTO> branches = dto.getBranches();
+        if (branches == null || branches.isEmpty()) {
+            DietDishBranchSaveDTO defaultBranch = new DietDishBranchSaveDTO();
+            defaultBranch.setBranchName("经典做法");
+            defaultBranch.setCuisineType("粤菜");
+            defaultBranch.setDietMode(0);
+            defaultBranch.setAutoCalculateNutrients(true);
+            defaultBranch.setCalories(BigDecimal.ZERO);
+            defaultBranch.setProtein(BigDecimal.ZERO);
+            defaultBranch.setFat(BigDecimal.ZERO);
+            defaultBranch.setCarbs(BigDecimal.ZERO);
+            defaultBranch.setIngredients(dto.getIngredients());
+            defaultBranch.setSteps(dto.getSteps());
+            branches = Collections.singletonList(defaultBranch);
+        }
 
-        LambdaQueryWrapper<DietDishStepRelation> stepDelete = new LambdaQueryWrapper<>();
-        stepDelete.eq(DietDishStepRelation::getDishId, dishId);
-        dishStepRelationMapper.delete(stepDelete);
-
-        // 4. 插入全新的配料关系
-        if (dto.getIngredients() != null) {
-            for (com.diet.modules.biz.model.dto.DietDishIngredientSaveDTO ingDto : dto.getIngredients()) {
-                DietDishIngredient rel = new DietDishIngredient();
-                rel.setDishId(dishId);
-                rel.setIngredientId(ingDto.getIngredientId());
-                rel.setUseAmount(ingDto.getUseAmount());
-                rel.setMainMaterialFlag(ingDto.getMainMaterialFlag() != null ? ingDto.getMainMaterialFlag() : 1);
-                rel.setDelFlag(0);
-                rel.setCreateTime(LocalDateTime.now());
-                rel.setUpdateTime(LocalDateTime.now());
-                dishIngredientMapper.insert(rel);
+        // 3. 对比已有的分支数据，清理已被用户删除的做法分支及其配料与步骤关联
+        Set<Long> incomingBranchIds = new HashSet<>();
+        for (DietDishBranchSaveDTO branchDTO : branches) {
+            if (branchDTO.getBranchId() != null) {
+                incomingBranchIds.add(branchDTO.getBranchId());
             }
         }
 
-        // 5. 插入全新的步骤关系
-        if (dto.getSteps() != null) {
-            for (com.diet.modules.biz.model.dto.DietDishStepSaveDTO stepDto : dto.getSteps()) {
-                DietDishStepRelation rel = new DietDishStepRelation();
-                rel.setDishId(dishId);
-                rel.setStepPoolId(stepDto.getStepPoolId() != null ? stepDto.getStepPoolId() : 0L);
-                rel.setStepNum(stepDto.getStepNum());
-                rel.setCustomDetail(stepDto.getCustomDetail());
-                rel.setDelFlag(0);
-                rel.setCreateTime(LocalDateTime.now());
-                rel.setUpdateTime(LocalDateTime.now());
-                dishStepRelationMapper.insert(rel);
+        LambdaQueryWrapper<DietDishCookingBranch> branchDelQuery = new LambdaQueryWrapper<>();
+        branchDelQuery.eq(DietDishCookingBranch::getDishId, dishId);
+        if (!incomingBranchIds.isEmpty()) {
+            branchDelQuery.notIn(DietDishCookingBranch::getBranchId, incomingBranchIds);
+        }
+        List<DietDishCookingBranch> toDeleteBranches = dishCookingBranchMapper.selectList(branchDelQuery);
+        for (DietDishCookingBranch b : toDeleteBranches) {
+            b.setDelFlag(1);
+            b.setUpdateTime(LocalDateTime.now());
+            dishCookingBranchMapper.updateById(b);
+
+            LambdaQueryWrapper<DietDishIngredient> ingClear = new LambdaQueryWrapper<>();
+            ingClear.eq(DietDishIngredient::getBranchId, b.getBranchId());
+            dishIngredientMapper.delete(ingClear);
+
+            LambdaQueryWrapper<DietDishStepRelation> stepClear = new LambdaQueryWrapper<>();
+            stepClear.eq(DietDishStepRelation::getBranchId, b.getBranchId());
+            dishStepRelationMapper.delete(stepClear);
+        }
+
+        // 4. 保存/更新每个做法分支，并处理其关联的原材料配料与步骤
+        List<DietDishCookingBranch> savedBranches = new ArrayList<>();
+        for (DietDishBranchSaveDTO branchDTO : branches) {
+            DietDishCookingBranch branch = new DietDishCookingBranch();
+            if (branchDTO.getBranchId() != null) {
+                branch = dishCookingBranchMapper.selectById(branchDTO.getBranchId());
+                if (branch == null) {
+                    throw new RuntimeException("修改的做法分支不存在！");
+                }
+            } else {
+                branch.setDishId(dishId);
+                branch.setDelFlag(0);
+                branch.setCreateTime(LocalDateTime.now());
+            }
+
+            branch.setBranchName(branchDTO.getBranchName());
+            branch.setCuisineType(branchDTO.getCuisineType() != null ? branchDTO.getCuisineType() : "粤菜");
+            branch.setDietMode(branchDTO.getDietMode() != null ? branchDTO.getDietMode() : 0);
+            branch.setCoverImageId(branchDTO.getCoverImageId());
+            branch.setUpdateTime(LocalDateTime.now());
+
+            // 智能核算热量与三大营养素
+            boolean needsCalc = (branchDTO.getAutoCalculateNutrients() != null && branchDTO.getAutoCalculateNutrients())
+                    || (branchDTO.getCalories() == null || branchDTO.getCalories().doubleValue() <= 0);
+
+            if (!needsCalc) {
+                branch.setCalories(branchDTO.getCalories());
+                branch.setProtein(branchDTO.getProtein() != null ? branchDTO.getProtein() : BigDecimal.ZERO);
+                branch.setFat(branchDTO.getFat() != null ? branchDTO.getFat() : BigDecimal.ZERO);
+                branch.setCarbs(branchDTO.getCarbs() != null ? branchDTO.getCarbs() : BigDecimal.ZERO);
+            } else {
+                if (branchDTO.getIngredients() == null || branchDTO.getIngredients().isEmpty()) {
+                    branch.setCalories(BigDecimal.ZERO);
+                    branch.setProtein(BigDecimal.ZERO);
+                    branch.setFat(BigDecimal.ZERO);
+                    branch.setCarbs(BigDecimal.ZERO);
+                } else {
+                    double totalWeight = 0;
+                    double totalCals = 0;
+                    double totalProt = 0;
+                    double totalFat = 0;
+                    double totalCarbs = 0;
+
+                    for (DietDishIngredientSaveDTO ingDto : branchDTO.getIngredients()) {
+                        DietIngredient ing = ingredientMapper.selectById(ingDto.getIngredientId());
+                        if (ing != null && ing.getDelFlag() == 0 && ingDto.getUseAmount() != null) {
+                            double weight = ingDto.getUseAmount().doubleValue();
+                            totalWeight += weight;
+                            totalCals += (ing.getCalories().doubleValue() * weight) / 100.0;
+                            totalProt += (ing.getProtein().doubleValue() * weight) / 100.0;
+                            totalFat += (ing.getFat().doubleValue() * weight) / 100.0;
+                            totalCarbs += (ing.getCarbs().doubleValue() * weight) / 100.0;
+                        }
+                    }
+
+                    if (totalWeight > 0) {
+                        branch.setCalories(BigDecimal.valueOf((totalCals / totalWeight) * 100.0).setScale(2, RoundingMode.HALF_UP));
+                        branch.setProtein(BigDecimal.valueOf((totalProt / totalWeight) * 100.0).setScale(2, RoundingMode.HALF_UP));
+                        branch.setFat(BigDecimal.valueOf((totalFat / totalWeight) * 100.0).setScale(2, RoundingMode.HALF_UP));
+                        branch.setCarbs(BigDecimal.valueOf((totalCarbs / totalWeight) * 100.0).setScale(2, RoundingMode.HALF_UP));
+                    } else {
+                        branch.setCalories(BigDecimal.ZERO);
+                        branch.setProtein(BigDecimal.ZERO);
+                        branch.setFat(BigDecimal.ZERO);
+                        branch.setCarbs(BigDecimal.ZERO);
+                    }
+                }
+            }
+
+            if (branch.getBranchId() != null) {
+                dishCookingBranchMapper.updateById(branch);
+            } else {
+                dishCookingBranchMapper.insert(branch);
+            }
+            Long branchId = branch.getBranchId();
+            savedBranches.add(branch);
+
+            // 清理此做法分支已有的配料与步骤关联
+            LambdaQueryWrapper<DietDishIngredient> ingDelete = new LambdaQueryWrapper<>();
+            ingDelete.eq(DietDishIngredient::getBranchId, branchId);
+            dishIngredientMapper.delete(ingDelete);
+
+            LambdaQueryWrapper<DietDishStepRelation> stepDelete = new LambdaQueryWrapper<>();
+            stepDelete.eq(DietDishStepRelation::getBranchId, branchId);
+            dishStepRelationMapper.delete(stepDelete);
+
+            // 插入配料关系
+            if (branchDTO.getIngredients() != null) {
+                for (DietDishIngredientSaveDTO ingDto : branchDTO.getIngredients()) {
+                    DietDishIngredient rel = new DietDishIngredient();
+                    rel.setDishId(dishId);
+                    rel.setBranchId(branchId);
+                    rel.setIngredientId(ingDto.getIngredientId());
+                    rel.setUseAmount(ingDto.getUseAmount());
+                    rel.setMainMaterialFlag(ingDto.getMainMaterialFlag() != null ? ingDto.getMainMaterialFlag() : 1);
+                    rel.setDelFlag(0);
+                    rel.setCreateTime(LocalDateTime.now());
+                    rel.setUpdateTime(LocalDateTime.now());
+                    dishIngredientMapper.insert(rel);
+                }
+            }
+
+            // 插入步骤关系
+            if (branchDTO.getSteps() != null) {
+                for (DietDishStepSaveDTO stepDto : branchDTO.getSteps()) {
+                    DietDishStepRelation rel = new DietDishStepRelation();
+                    rel.setDishId(dishId);
+                    rel.setBranchId(branchId);
+                    rel.setStepPoolId(stepDto.getStepPoolId() != null ? stepDto.getStepPoolId() : 0L);
+                    rel.setStepNum(stepDto.getStepNum());
+                    rel.setCustomDetail(stepDto.getCustomDetail());
+                    rel.setDurationSeconds(stepDto.getDurationSeconds() != null ? stepDto.getDurationSeconds() : 0);
+                    rel.setFirePower(stepDto.getFirePower() != null ? stepDto.getFirePower() : 0);
+                    rel.setDelFlag(0);
+                    rel.setCreateTime(LocalDateTime.now());
+                    rel.setUpdateTime(LocalDateTime.now());
+                    dishStepRelationMapper.insert(rel);
+                }
             }
         }
 
         return true;
+    }
+
+    /**
+     * 软删除特定做法分支，级联清理其配料及步骤关联。如果该菜谱已无其他有效分支，则同步软删除菜谱主表。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean deleteBranch(Long branchId) {
+        DietDishCookingBranch branch = dishCookingBranchMapper.selectById(branchId);
+        if (branch == null || branch.getDelFlag() == 1) {
+            return false;
+        }
+
+        // 1. 软删除此做法分支
+        branch.setDelFlag(1);
+        branch.setUpdateTime(LocalDateTime.now());
+        int updated = dishCookingBranchMapper.updateById(branch);
+        if (updated > 0) {
+            // 2. 清除配料及步骤关联
+            LambdaQueryWrapper<DietDishIngredient> ingClear = new LambdaQueryWrapper<>();
+            ingClear.eq(DietDishIngredient::getBranchId, branchId);
+            dishIngredientMapper.delete(ingClear);
+
+            LambdaQueryWrapper<DietDishStepRelation> stepClear = new LambdaQueryWrapper<>();
+            stepClear.eq(DietDishStepRelation::getBranchId, branchId);
+            dishStepRelationMapper.delete(stepClear);
+
+            // 3. 检查主菜谱下是否还存在其他有效的做法分支。若无，级联删除主菜谱记录
+            LambdaQueryWrapper<DietDishCookingBranch> activeBranchesQuery = new LambdaQueryWrapper<>();
+            activeBranchesQuery.eq(DietDishCookingBranch::getDishId, branch.getDishId())
+                    .eq(DietDishCookingBranch::getDelFlag, 0);
+            Long activeCount = dishCookingBranchMapper.selectCount(activeBranchesQuery);
+            if (activeCount == 0) {
+                DietDish dish = dishMapper.selectById(branch.getDishId());
+                if (dish != null && dish.getDelFlag() == 0) {
+                    dish.setDelFlag(1);
+                    dish.setUpdateTime(LocalDateTime.now());
+                    dishMapper.updateById(dish);
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -420,7 +629,17 @@ public class DietDishService extends ServiceImpl<DietDishMapper, DietDish> {
             dish.setUpdateTime(LocalDateTime.now());
             int updated = dishMapper.updateById(dish);
             if (updated > 0) {
-                // 同步软删除其食材与步骤配方关联
+                // 1. 软删除其所有做法分支
+                LambdaQueryWrapper<DietDishCookingBranch> branchQuery = new LambdaQueryWrapper<>();
+                branchQuery.eq(DietDishCookingBranch::getDishId, dishId);
+                List<DietDishCookingBranch> branches = dishCookingBranchMapper.selectList(branchQuery);
+                for (DietDishCookingBranch b : branches) {
+                    b.setDelFlag(1);
+                    b.setUpdateTime(LocalDateTime.now());
+                    dishCookingBranchMapper.updateById(b);
+                }
+
+                // 2. 同步软删除其食材与步骤配方关联
                 LambdaQueryWrapper<DietDishIngredient> ingQuery = new LambdaQueryWrapper<>();
                 ingQuery.eq(DietDishIngredient::getDishId, dishId);
                 List<DietDishIngredient> ingredients = dishIngredientMapper.selectList(ingQuery);

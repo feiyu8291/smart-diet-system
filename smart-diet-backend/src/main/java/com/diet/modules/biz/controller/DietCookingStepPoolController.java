@@ -1,7 +1,10 @@
 package com.diet.modules.biz.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.diet.modules.biz.model.entity.DietCookingStepPool;
+import com.diet.modules.biz.model.po.DietCookingStepQueryPO;
 import com.diet.modules.biz.service.DietCookingStepPoolService;
 import com.diet.modules.common.entity.Result;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,6 +42,24 @@ public class DietCookingStepPoolController {
 
         List<DietCookingStepPool> list = cookingStepPoolService.list(query);
         return Result.success(list);
+    }
+
+    @Operation(summary = "标准步骤模板分页查询")
+    @GetMapping("/page")
+    public Result<List<DietCookingStepPool>> page(DietCookingStepQueryPO po) {
+        if (po == null) {
+            po = new DietCookingStepQueryPO();
+        }
+        Page<DietCookingStepPool> page = new Page<>(po.getPageNo(), po.getPageSize());
+        LambdaQueryWrapper<DietCookingStepPool> query = new LambdaQueryWrapper<>();
+        query.eq(DietCookingStepPool::getDelFlag, 0);
+        if (po.getName() != null && !po.getName().trim().isEmpty()) {
+            query.like(DietCookingStepPool::getStepName, po.getName().trim());
+        }
+        query.orderByAsc(DietCookingStepPool::getStepPoolId);
+
+        IPage<DietCookingStepPool> pageResult = cookingStepPoolService.page(page, query);
+        return Result.successPage(pageResult);
     }
 
     @Operation(summary = "保存/修改步骤模板")

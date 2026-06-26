@@ -7,6 +7,7 @@ import com.diet.modules.common.entity.Result;
 import com.diet.modules.system.model.dto.ChangePasswordDTO;
 import com.diet.modules.system.model.dto.SysUserDTO;
 import com.diet.modules.system.model.entity.SysRole;
+import com.diet.modules.system.model.entity.SysUser;
 import com.diet.modules.system.model.po.SysUserQueryPO;
 import com.diet.modules.system.model.vo.SysUserInfoVO;
 import com.diet.modules.system.model.vo.SysUserVO;
@@ -97,6 +98,12 @@ public class SysUserController {
     @GetMapping("/getAllRoles")
     public Result<List<SysRole>> getAllRoles() {
         return Result.success(sysRoleService.listAll());
+    }
+
+    @Operation(summary = "获取全量用户(无分页)")
+    @GetMapping("/listAll")
+    public Result<List<SysUser>> listAll() {
+        return Result.success(sysUserService.listAll());
     }
 
     @Operation(summary = "获取当前登录用户信息")

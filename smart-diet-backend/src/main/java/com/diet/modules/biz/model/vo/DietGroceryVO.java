@@ -1,5 +1,6 @@
 package com.diet.modules.biz.model.vo;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -11,10 +12,16 @@ import java.math.BigDecimal;
  * @date 2026-06-20
  */
 @Data
+@Schema(description = "采购清单条目视图对象")
 public class DietGroceryVO {
+    @Schema(description = "原材料ID")
     private Long ingredientId;
+    @Schema(description = "useAmount")
     private BigDecimal useAmount;
+    @Schema(description = "原材料名称")
     private String ingredientName;
+    @Schema(description = "measureUnit")
     private String measureUnit;
+    @Schema(description = "condimentFlag")
     private Integer condimentFlag;
 }

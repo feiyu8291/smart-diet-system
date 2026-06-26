@@ -1,5 +1,6 @@
 package com.diet.modules.biz.model.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.util.List;
@@ -11,10 +12,16 @@ import java.util.List;
  * @date 2026-06-20
  */
 @Data
+@Schema(description = "配餐计划单餐保存传输对象")
 public class DietMealPlanSaveDTO {
+    @Schema(description = "家庭组ID")
     private Long groupId;
+    @Schema(description = "targetDate")
     private String targetDate;
+    @Schema(description = "mealPeriod")
     private Integer mealPeriod;
+    @Schema(description = "建议就餐模式 (0-正常饮食, 1-轻食减脂, 2-放纵餐)")
     private Integer dietMode;
-    private List<Long> dishIds;
+    @Schema(description = "做法分支ID列表")
+    private List<Long> branchIds;
 }

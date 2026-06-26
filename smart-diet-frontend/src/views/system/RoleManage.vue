@@ -40,9 +40,11 @@
           style="width: 100%"
       >
         <el-table-column type="selection" width="55" align="center"/>
-        <el-table-column prop="roleName" label="角色名称"/>
-        <el-table-column prop="roleDescription" label="描述"/>
-        <el-table-column prop="createTime" label="创建时间" width="160"/>
+        <el-table-column prop="roleName" label="角色名称" width="160"/>
+        <el-table-column prop="roleDescription" label="描述" min-width="160"/>
+        <el-table-column prop="createTime" label="创建时间" width="180"/>
+        <el-table-column prop="updateTime" label="修改时间" width="180"/>
+        <el-table-column prop="createBy" label="创建人" width="120"/>
         <el-table-column label="操作" width="250" fixed="right" align="center">
           <template #default="scope">
             <el-button type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
@@ -122,15 +124,7 @@
 <script setup lang="ts">
 import {nextTick, onMounted, reactive, ref} from 'vue';
 import {ElMessage, ElMessageBox} from 'element-plus';
-import {
-  configRoleMenus,
-  deleteRole,
-  getMenuTree,
-  getRoleMenuIds,
-  getRolePage,
-  saveRole,
-  updateRole
-} from '../../api/system';
+import {configRoleMenus, deleteRole, getMenuTree, getRoleMenuIds, getRolePage, saveRole, updateRole} from '../../api/system';
 
 // 查询参数
 const searchParams = reactive({

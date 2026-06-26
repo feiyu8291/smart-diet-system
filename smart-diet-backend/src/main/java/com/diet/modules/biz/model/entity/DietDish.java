@@ -3,30 +3,23 @@ package com.diet.modules.biz.model.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.diet.modules.common.entity.BaseEntity;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import lombok.EqualsAndHashCode;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 @TableName("diet_dish")
-public class DietDish {
-    @TableId(type = IdType.AUTO)
-    private Long dishId;
-    private String dishName;
-    private String cuisineType;
-    private Integer dietMode; // 0-正常饮食, 1-轻食减脂, 2-放纵餐
-    private BigDecimal calories;
-    private BigDecimal protein;
-    private BigDecimal fat;
-    private BigDecimal carbs;
-    private Long coverImageId;
-    private String imageIds;
+@Schema(description = "系统菜谱基本信息实体类")
+public class DietDish extends BaseEntity {
 
-    // 审计字段
-    private Integer delFlag;
-    private String createBy;
-    private String updateBy;
-    private LocalDateTime createTime;
-    private LocalDateTime updateTime;
+    @TableId(type = IdType.AUTO)
+    @Schema(description = "菜谱ID")
+    private Long dishId;
+    @Schema(description = "菜谱名称")
+    private String dishName;
+    @Schema(description = "封面图片ID")
+    private Long coverImageId;
+
 }
