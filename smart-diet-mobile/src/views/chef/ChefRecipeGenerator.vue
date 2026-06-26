@@ -243,8 +243,8 @@ const handlePublish = async () => {
               <span class="d-cal">{{ dish.calories }} kcal</span>
             </div>
             <div class="chip-actions">
-              <span class="act-btn" @click="handleRandomSwap('breakfast', idx)">🔄 换一批</span>
-              <span class="act-btn border-l" @click="triggerReplace('breakfast', idx)">🔍 挑选</span>
+              <span class="act-btn" @click="handleRandomSwap('breakfast', Number(idx))">🔄 换一批</span>
+              <span class="act-btn border-l" @click="triggerReplace('breakfast', Number(idx))">🔍 挑选</span>
             </div>
           </div>
         </div>
@@ -260,8 +260,8 @@ const handlePublish = async () => {
               <span class="d-cal">{{ dish.calories }} kcal</span>
             </div>
             <div class="chip-actions">
-              <span class="act-btn" @click="handleRandomSwap('lunch', idx)">🔄 换一批</span>
-              <span class="act-btn border-l" @click="triggerReplace('lunch', idx)">🔍 挑选</span>
+              <span class="act-btn" @click="handleRandomSwap('lunch', Number(idx))">🔄 换一批</span>
+              <span class="act-btn border-l" @click="triggerReplace('lunch', Number(idx))">🔍 挑选</span>
             </div>
           </div>
         </div>
@@ -277,8 +277,8 @@ const handlePublish = async () => {
               <span class="d-cal">{{ dish.calories }} kcal</span>
             </div>
             <div class="chip-actions">
-              <span class="act-btn" @click="handleRandomSwap('dinner', idx)">🔄 换一批</span>
-              <span class="act-btn border-l" @click="triggerReplace('dinner', idx)">🔍 挑选</span>
+              <span class="act-btn" @click="handleRandomSwap('dinner', Number(idx))">🔄 换一批</span>
+              <span class="act-btn border-l" @click="triggerReplace('dinner', Number(idx))">🔍 挑选</span>
             </div>
           </div>
         </div>

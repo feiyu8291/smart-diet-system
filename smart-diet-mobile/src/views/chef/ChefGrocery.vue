@@ -50,7 +50,7 @@ const fetchGrocery = async () => {
           id: item.groceryId || idx,
           name: item.ingredientName,
           amount: `${item.useAmount} ${item.measureUnit || 'g'}`,
-          category: item.condimentFlag === 1 ? 'condiment' : (item.mainMaterialFlag === 1 ? 'main' : 'sub'),
+          category: item.ingredientType === 4 || item.ingredientType === 3 ? 'condiment' : (item.mainMaterialFlag === 1 ? 'main' : 'sub'),
           checked: false
         }
       })

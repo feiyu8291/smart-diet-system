@@ -551,7 +551,8 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
             if (ing != null) {
                 item.setIngredientName(ing.getIngredientName());
                 item.setMeasureUnit(ing.getMeasureUnit());
-                item.setCondimentFlag(ing.getCondimentFlag());
+                item.setIngredientType(ing.getIngredientType());
+                item.setIngredientDesc(ing.getIngredientDesc());
             }
             groceryDetails.add(item);
         }
@@ -606,7 +607,8 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
                     copy.setIngredientId(grocery.getIngredientId());
                     copy.setIngredientName(grocery.getIngredientName());
                     copy.setMeasureUnit(grocery.getMeasureUnit());
-                    copy.setCondimentFlag(grocery.getCondimentFlag());
+                    copy.setIngredientType(grocery.getIngredientType());
+                    copy.setIngredientDesc(grocery.getIngredientDesc());
                     copy.setUseAmount(grocery.getUseAmount() != null ? grocery.getUseAmount() : BigDecimal.ZERO);
                     mergedMap.put(grocery.getIngredientId(), copy);
                 } else {

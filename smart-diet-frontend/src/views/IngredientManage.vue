@@ -9,7 +9,7 @@
           </el-icon>
           原材料库管理
         </h3>
-        <span class="sub-title">系统膳食原材料数据维护，包含主配原料、调味辅料类型设定与每百克基础营养占比</span>
+        <span class="sub-title">系统膳食原材料数据维护，包含荤菜类、素菜类、调辅配料、基础调味分类设定与每百克基础营养占比</span>
       </div>
 
       <!-- 搜索与操作栏（合并为单行展示） -->
@@ -25,10 +25,12 @@
             />
           </el-form-item>
           <el-form-item label="类型">
-            <el-select v-model="filterCondiment" placeholder="类型过滤" style="width: 140px" clearable @change="loadIngredients">
+            <el-select v-model="filterType" placeholder="类型过滤" style="width: 140px" clearable @change="loadIngredients">
               <el-option :value="null" label="全部类型"/>
-              <el-option :value="0" label="主配料"/>
-              <el-option :value="1" label="调味品"/>
+              <el-option :value="1" label="荤菜类"/>
+              <el-option :value="2" label="素菜类"/>
+              <el-option :value="3" label="调辅配料"/>
+              <el-option :value="4" label="基础调味"/>
             </el-select>
           </el-form-item>
           <el-form-item>
@@ -56,13 +58,16 @@
       >
         <el-table-column prop="ingredientId" label="ID" width="80" align="center"/>
         <el-table-column prop="ingredientName" label="原材料名称" min-width="150"/>
-        <el-table-column prop="condimentFlag" label="类型" width="95" align="center">
+        <el-table-column prop="ingredientType" label="类型" width="105" align="center">
           <template #default="scope">
-            <span :class="['type-badge', scope.row.condimentFlag === 1 ? 'type-condiment' : 'type-ingredient']">
-              {{ scope.row.condimentFlag === 1 ? '调味品' : '主配料' }}
-            </span>
+            <span v-if="scope.row.ingredientType === 1" class="type-badge type-meat">{{ scope.row.ingredientTypeLabel }}</span>
+            <span v-else-if="scope.row.ingredientType === 2" class="type-badge type-veg">{{ scope.row.ingredientTypeLabel }}</span>
+            <span v-else-if="scope.row.ingredientType === 3" class="type-badge type-side">{{ scope.row.ingredientTypeLabel }}</span>
+            <span v-else-if="scope.row.ingredientType === 4" class="type-badge type-condiment">{{ scope.row.ingredientTypeLabel }}</span>
+            <span v-else class="type-badge type-unknown">{{ scope.row.ingredientTypeLabel || '未知' }}</span>
           </template>
         </el-table-column>
+        <el-table-column prop="ingredientDesc" label="食材描述(健康选购及烹饪备注)" min-width="200" show-overflow-tooltip/>
         <el-table-column prop="measureUnit" label="单位" width="80" align="center"/>
         <el-table-column label="热量 (100g)" width="110" align="right">
           <template #default="scope">
@@ -137,10 +142,24 @@
 
         <div class="form-item">
           <label class="caption">类型属性</label>
-          <el-select v-model="form.condimentFlag" placeholder="主料还是调味料" style="width: 100%">
-            <el-option :value="0" label="主配配料 (如鸡胸肉、西兰花，配餐计算主力)"/>
-            <el-option :value="1" label="调味辅料 (如生抽、豆瓣酱、食用油，提供风味)"/>
+          <el-select v-model="form.ingredientType" placeholder="请选择食材分类" style="width: 100%">
+            <el-option :value="1" label="荤菜类 (如畜禽肉、蛋类、乳制品)"/>
+            <el-option :value="2" label="素菜类 (如蔬菜、豆制品、主食粗粮)"/>
+            <el-option :value="3" label="调辅配料 (如葱姜蒜、香料、干辣椒等)"/>
+            <el-option :value="4" label="基础调味 (如食用油、盐、生抽、醋、豆瓣酱等)"/>
           </el-select>
+        </div>
+
+        <div class="form-item">
+          <label class="caption">食材描述(健康选购及烹饪备注)</label>
+          <el-input
+              type="textarea"
+              v-model="form.ingredientDesc"
+              :rows="3"
+              placeholder="输入食材的健康选购及烹饪备注信息，如：低脂高蛋白、控量使用等"
+              maxlength="500"
+              show-word-limit
+          />
         </div>
 
         <!-- 营养素属性 (每100克或100毫升) -->
@@ -187,7 +206,7 @@ import request from '../utils/request'
 const loading = ref(false)
 const ingredients = ref<any[]>([])
 const searchName = ref('')
-const filterCondiment = ref<number | null>(null)
+const filterType = ref<number | null>(null)
 const modalVisible = ref(false)
 
 // 分页相关变量
@@ -203,7 +222,8 @@ const defaultForm = {
   fat: 0.0,
   carbs: 0.0,
   measureUnit: 'g',
-  condimentFlag: 0 // 默认主材料
+  ingredientType: 1, // 默认荤菜类
+  ingredientDesc: ''
 }
 const form = ref({...defaultForm})
 
@@ -215,8 +235,8 @@ const loadIngredients = async () => {
     if (searchName.value.trim()) {
       url += `&name=${encodeURIComponent(searchName.value.trim())}`
     }
-    if (filterCondiment.value !== null) {
-      url += `&condimentFlag=${filterCondiment.value}`
+    if (filterType.value !== null && filterType.value !== undefined && String(filterType.value) !== 'undefined') {
+      url += `&ingredientType=${filterType.value}`
     }
     const res: any = await request.get(url)
     if (res && res.code === 200) {
@@ -232,7 +252,7 @@ const loadIngredients = async () => {
 
 const resetSearch = () => {
   searchName.value = ''
-  filterCondiment.value = null
+  filterType.value = null
   currentPage.value = 1
   loadIngredients()
 }
@@ -372,14 +392,29 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.type-ingredient {
-  background-color: rgba(0, 100, 0, 0.08);
-  color: var(--semantic-success);
+.type-meat {
+  background-color: rgba(220, 53, 69, 0.08); /* 红色 */
+  color: #dc3545;
+}
+
+.type-veg {
+  background-color: rgba(40, 167, 69, 0.08); /* 绿色 */
+  color: #28a745;
+}
+
+.type-side {
+  background-color: rgba(0, 123, 255, 0.08); /* 蓝色 */
+  color: #007bff;
 }
 
 .type-condiment {
-  background-color: rgba(252, 171, 121, 0.15);
-  color: var(--signature-coral);
+  background-color: rgba(253, 126, 20, 0.08); /* 黄橙色 */
+  color: #fd7e14;
+}
+
+.type-unknown {
+  background-color: rgba(108, 117, 125, 0.08);
+  color: #6c757d;
 }
 
 .unit {

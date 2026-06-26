@@ -1,8 +1,11 @@
 package com.diet.modules.biz.model.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.diet.modules.common.aspect.DictAnnotation;
+import com.diet.modules.common.aspect.DictTypeEnum;
 import com.diet.modules.common.entity.BaseEntity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -30,7 +33,13 @@ public class DietIngredient extends BaseEntity {
     private BigDecimal carbs;
     @Schema(description = "measureUnit")
     private String measureUnit;
-    @Schema(description = "0-主材料, 1-调料")
-    private Integer condimentFlag;
+    @Schema(description = "食材类型(1-荤菜类, 2-素菜类, 3-调辅配料, 4-基础调味)")
+    @DictAnnotation(type = DictTypeEnum.INGREDIENT_TYPE, target = "ingredientTypeLabel")
+    private Integer ingredientType;
+    @TableField(exist = false)
+    @Schema(description = "食材类型中文名称")
+    private String ingredientTypeLabel;
+    @Schema(description = "食材描述(健康选购及烹饪备注)")
+    private String ingredientDesc;
 
 }

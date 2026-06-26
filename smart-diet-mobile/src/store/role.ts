@@ -11,7 +11,7 @@ export const useRoleStore = defineStore('role', () => {
     const profileId = ref<number>(Number(localStorage.getItem('profileId') || 0))
 
     // 用户所拥有的角色列表和家庭组列表
-    const userRoles = ref<'chef' | 'diner'[]>(JSON.parse(localStorage.getItem('userRoles') || '["chef", "diner"]'))
+    const userRoles = ref<('chef' | 'diner')[]>(JSON.parse(localStorage.getItem('userRoles') || '["chef", "diner"]'))
     const userGroups = ref<{ id: number; name: string }[]>(
         JSON.parse(localStorage.getItem('userGroups') || '[{"id": 1, "name": "健康快乐一家人"}, {"id": 2, "name": "活力四射健身组"}]')
     )

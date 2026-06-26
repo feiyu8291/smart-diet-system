@@ -34,19 +34,19 @@ public class DietIngredientController {
     @GetMapping("/list")
     public Result<List<DietIngredient>> list(
             @RequestParam(required = false) String name,
-            @RequestParam(required = false) Integer condimentFlag) {
+            @RequestParam(required = false) Integer ingredientType) {
 
         LambdaQueryWrapper<DietIngredient> query = new LambdaQueryWrapper<>();
         query.eq(DietIngredient::getDelFlag, 0);
         if (name != null && !name.trim().isEmpty()) {
             query.like(DietIngredient::getIngredientName, name.trim());
         }
-        if (condimentFlag != null) {
-            query.eq(DietIngredient::getCondimentFlag, condimentFlag);
+        if (ingredientType != null) {
+            query.eq(DietIngredient::getIngredientType, ingredientType);
         }
         query.orderByAsc(DietIngredient::getIngredientId);
 
-        List<DietIngredient> list = ingredientService.list(query);
+        List<DietIngredient> list = ingredientService.listIngredients(query);
         return Result.success(list);
     }
 
@@ -62,12 +62,12 @@ public class DietIngredientController {
         if (po.getName() != null && !po.getName().trim().isEmpty()) {
             query.like(DietIngredient::getIngredientName, po.getName().trim());
         }
-        if (po.getCondimentFlag() != null) {
-            query.eq(DietIngredient::getCondimentFlag, po.getCondimentFlag());
+        if (po.getIngredientType() != null) {
+            query.eq(DietIngredient::getIngredientType, po.getIngredientType());
         }
         query.orderByAsc(DietIngredient::getIngredientId);
 
-        IPage<DietIngredient> pageResult = ingredientService.page(page, query);
+        IPage<DietIngredient> pageResult = ingredientService.pageIngredients(page, query);
         return Result.successPage(pageResult);
     }
 

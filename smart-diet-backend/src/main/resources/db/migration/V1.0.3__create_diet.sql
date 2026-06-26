@@ -205,7 +205,8 @@ CREATE TABLE IF NOT EXISTS diet_ingredient
     fat             DECIMAL(5, 2) NOT NULL,
     carbs           DECIMAL(5, 2) NOT NULL,
     measure_unit    VARCHAR(10)            DEFAULT 'g',
-    condiment_flag  SMALLINT               DEFAULT 0,
+    ingredient_type SMALLINT      NOT NULL DEFAULT 1,
+    ingredient_desc VARCHAR(512)           DEFAULT NULL,
     del_flag        SMALLINT      NOT NULL DEFAULT 0,
     create_by       VARCHAR(64),
     update_by       VARCHAR(64),
@@ -222,7 +223,8 @@ COMMENT ON COLUMN diet_ingredient.protein IS '每100克/毫升蛋白质(g)';
 COMMENT ON COLUMN diet_ingredient.fat IS '每100克/毫升脂肪(g)';
 COMMENT ON COLUMN diet_ingredient.carbs IS '每100克/毫升碳水(g)';
 COMMENT ON COLUMN diet_ingredient.measure_unit IS '计量单位(如g/ml)';
-COMMENT ON COLUMN diet_ingredient.condiment_flag IS '调味辅料标识(0-主配料, 1-调味品)';
+COMMENT ON COLUMN diet_ingredient.ingredient_type IS '食材类型(1-荤菜类, 2-素菜类, 3-调辅配料, 4-基础调味)';
+COMMENT ON COLUMN diet_ingredient.ingredient_desc IS '食材描述(健康选购及烹饪备注)';
 COMMENT ON COLUMN diet_ingredient.del_flag IS '删除标识(0否1是)';
 COMMENT ON COLUMN diet_ingredient.create_by IS '创建人';
 COMMENT ON COLUMN diet_ingredient.update_by IS '更新人';

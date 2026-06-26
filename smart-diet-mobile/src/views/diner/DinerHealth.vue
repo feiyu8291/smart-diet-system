@@ -531,7 +531,7 @@ onMounted(() => {
               label="身份证号"
               placeholder="输入18位身份证号自动识别"
               maxlength="18"
-              @input="e => handleIdCardInput(e.target.value)"
+              @input="(e: any) => handleIdCardInput(e.target.value)"
           />
 
           <van-cell title="出生日期" required>

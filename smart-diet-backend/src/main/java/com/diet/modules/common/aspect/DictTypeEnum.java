@@ -33,7 +33,8 @@ public enum DictTypeEnum {
     ORDER_AUDIT_STATUS("订单审核状态", "order_audit_status", "0待审核 1已通过 2已驳回", Category.NORMAL),
     FIRE_POWER_TYPE("火候类型", "fire_power_type", "0非热处理 1小火/慢炖 2中火/清蒸 3大火/爆炒", Category.NORMAL),
     CUISINE_TYPE("菜系类型", "cuisine_type", "常规菜系", Category.NORMAL),
-    DIET_MODE_TYPE("膳食模式", "diet_mode_type", "0正常饮食 1轻食减脂 2放纵餐", Category.NORMAL);
+    DIET_MODE_TYPE("膳食模式", "diet_mode_type", "0正常饮食 1轻食减脂 2放纵餐", Category.NORMAL),
+    INGREDIENT_TYPE("食材类型", "ingredient_type", "1荤菜类 2素菜类 3调辅配料 4基础调味", Category.NORMAL);
 
     private final String dictName;
     private final String dictType;
