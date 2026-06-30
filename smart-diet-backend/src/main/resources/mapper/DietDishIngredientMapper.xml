@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.diet.modules.biz.mapper.DietDishIngredientMapper">
+
+    <select id="selectRecipeIngredientsByBranchId" resultType="com.diet.modules.biz.model.vo.DietDishIngredientVO">
+        SELECT
+            r.relation_id AS relationId,
+            CAST(r.use_amount AS CHAR) AS useAmount,
+            r.main_material_flag AS mainMaterialFlag,
+            i.ingredient_id AS ingredientId,
+            i.ingredient_name AS ingredientName,
+            i.measure_unit AS measureUnit
+        FROM diet_dish_ingredient r
+        LEFT JOIN diet_ingredient i ON r.ingredient_id = i.ingredient_id
+        WHERE r.branch_id = #{branchId} AND r.del_flag = 0 AND i.del_flag = 0
+    </select>
+
+</mapper>

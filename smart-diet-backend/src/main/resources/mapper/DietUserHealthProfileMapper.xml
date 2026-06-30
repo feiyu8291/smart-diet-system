@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.diet.modules.biz.mapper.DietUserHealthProfileMapper">
+
+    <!-- 连表分页查询成员健康档案 -->
+    <select id="selectProfilePage" resultType="com.diet.modules.biz.model.vo.DietUserHealthProfileVO">
+        SELECT
+            p.profile_id AS profileId,
+            p.user_id AS userId,
+            p.group_id AS groupId,
+            p.group_role AS groupRole,
+            p.member_name AS memberName,
+            p.member_relation AS memberRelation,
+            p.member_gender AS memberGender,
+            p.member_height AS memberHeight,
+            p.member_weight AS memberWeight,
+            p.member_birthday AS memberBirthday,
+            p.activity_level AS activityLevel,
+            p.target_weight AS targetWeight,
+            p.diet_speed AS dietSpeed,
+            p.bmr_calories AS bmrCalories,
+            p.tdee_calories AS tdeeCalories,
+            p.daily_target_calories AS dailyTargetCalories,
+            p.create_time AS createTime,
+            p.update_time AS updateTime,
+            g.group_name AS groupName
+        FROM diet_user_health_profile p
+        LEFT JOIN diet_family_group g ON p.group_id = g.group_id AND g.del_flag = 0
+        WHERE p.del_flag = 0
+        <if test="po.groupId != null">
+            AND p.group_id = #{po.groupId}
+        </if>
+        <if test="po.name != null and po.name.trim() != ''">
+            AND p.member_name LIKE CONCAT('%', #{po.name}, '%')
+        </if>
+        ORDER BY p.profile_id DESC
+    </select>
+
+</mapper>

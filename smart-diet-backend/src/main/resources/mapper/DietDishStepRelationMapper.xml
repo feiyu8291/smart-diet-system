@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.diet.modules.biz.mapper.DietDishStepRelationMapper">
+
+    <select id="selectRecipeStepsByBranchId" resultType="com.diet.modules.biz.model.vo.DietDishStepVO">
+        SELECT
+            r.step_num AS stepNum,
+            IFNULL(NULLIF(TRIM(r.custom_detail), ''), p.step_detail) AS stepDetail,
+            r.duration_seconds AS durationSeconds,
+            r.fire_power AS firePower
+        FROM diet_dish_step_relation r
+        LEFT JOIN diet_cooking_step_pool p ON r.step_pool_id = p.step_pool_id
+        WHERE r.branch_id = #{branchId} AND r.del_flag = 0 AND (p.del_flag = 0 OR p.del_flag IS NULL)
+        ORDER BY r.step_num ASC
+    </select>
+
+</mapper>
