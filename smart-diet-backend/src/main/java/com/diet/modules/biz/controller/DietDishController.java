@@ -1,13 +1,20 @@
 package com.diet.modules.biz.controller;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.text.CharSequenceUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.diet.modules.biz.model.dto.DietDishSaveDTO;
 import com.diet.modules.biz.model.dto.DietDislikeDTO;
 import com.diet.modules.biz.model.dto.DietSkilledDTO;
 import com.diet.modules.biz.model.dto.DietWishDTO;
+import com.diet.modules.biz.model.entity.DietDish;
+import com.diet.modules.biz.model.entity.DietDishCookingBranch;
 import com.diet.modules.biz.model.po.DietDishQueryPO;
+import com.diet.modules.biz.model.vo.DietDishBranchVO;
 import com.diet.modules.biz.model.vo.DietDishDetailVO;
 import com.diet.modules.biz.model.vo.DietDishVO;
+import com.diet.modules.biz.service.DietDishCookingBranchService;
 import com.diet.modules.biz.service.DietDishService;
 import com.diet.modules.common.entity.BaseDeleteDTO;
 import com.diet.modules.common.entity.Result;
@@ -16,7 +23,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 菜谱管理 Controller 接口类
@@ -32,6 +40,57 @@ import java.util.List;
 public class DietDishController {
 
     private final DietDishService dishService;
+    private final DietDishCookingBranchService cookingBranchService;
+
+    @Operation(summary = "查询做法分支列表(做法广场大卡片)")
+    @GetMapping("/list-branches")
+    public Result<List<DietDishBranchVO>> listBranches() {
+        List<DietDishCookingBranch> branches = cookingBranchService.lambdaQuery()
+                .eq(DietDishCookingBranch::getDelFlag, 0)
+                .list();
+        if (CollUtil.isEmpty(branches)) {
+            return Result.success(Collections.emptyList());
+        }
+
+        List<Long> dishIds = branches.stream().map(DietDishCookingBranch::getDishId).distinct().collect(Collectors.toList());
+        Map<Long, DietDish> dishMap = dishService.listByIds(dishIds).stream()
+                .collect(Collectors.toMap(DietDish::getDishId, d -> d));
+
+        List<DietDishBranchVO> voList = branches.stream().map(b -> {
+            DietDishBranchVO vo = new DietDishBranchVO();
+            BeanUtil.copyProperties(b, vo);
+
+            DietDish dish = dishMap.get(b.getDishId());
+            if (Objects.nonNull(dish)) {
+                vo.setDishId(dish.getDishId());
+                vo.setDishName(dish.getDishName());
+            }
+
+            List<String> tags = new ArrayList<>();
+            if (CharSequenceUtil.isNotBlank(b.getCuisineType())) {
+                tags.add(b.getCuisineType());
+            }
+            if (b.getDietMode() != null) {
+                if (b.getDietMode() == 0) tags.add("正常饮食");
+                else if (b.getDietMode() == 1) tags.add("轻食减脂");
+                else if (b.getDietMode() == 2) tags.add("放纵餐");
+            }
+            if (b.getProtein() != null && b.getProtein().doubleValue() > 10) {
+                tags.add("高蛋白");
+            }
+            vo.setTags(tags);
+
+            // 给定合理的默认初始值
+            vo.setLikes(15);
+            vo.setCollects(8);
+            vo.setLiked(false);
+            vo.setCollected(false);
+
+            return vo;
+        }).collect(Collectors.toList());
+
+        return Result.success(voList);
+    }
 
     @Operation(summary = "菜谱分页查询")
     @PostMapping("/page")

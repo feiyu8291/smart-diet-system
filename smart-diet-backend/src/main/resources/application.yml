@@ -54,6 +54,7 @@ diet:
     secret: smartdietsecretkeyforjwttokenauthsystem123456
     exclude-urls:
       - /api/auth/login
+      - /api/auth/loginByIdCard
       - /api/auth/public-key
       - /swagger-ui
       - /v3/api-docs

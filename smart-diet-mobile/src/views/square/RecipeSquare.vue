@@ -2,7 +2,7 @@
 import {computed, onMounted, ref} from 'vue'
 import {useRoleStore} from '../../store/role'
 import request from '../../utils/request'
-import {showSuccessToast, showToast} from 'vant'
+import {showConfirmDialog, showSuccessToast, showToast} from 'vant'
 
 const roleStore = useRoleStore()
 const loading = ref(false)
@@ -12,10 +12,19 @@ const selectedCuisine = ref('全部')
 // 菜系过滤选项
 const cuisines = ['全部', '粤菜', '湘菜', '川菜', '鲁菜', '闽菜']
 
-// 菜谱详情 Popup 状态
+// 做法详情 Popup 状态
 const showDetail = ref(false)
-const activeBranchId = ref<number | null>(null)
-const currentDish = ref<any>(null)
+const currentRecipe = ref<any>(null)
+
+// 用餐人加入心愿单表单状态
+const showWishDialog = ref(false)
+const wishForm = ref({
+  dishId: null as number | null,
+  branchId: null as number | null,
+  dishName: '',
+  wishDate: new Date().toISOString().split('T')[0],
+  wishNote: ''
+})
 
 // 模拟的高颜值菜谱及做法分支数据
 const mockDishes = [
@@ -36,6 +45,7 @@ const mockDishes = [
         fat: 1.8,
         carbs: 2.5,
         likes: 88,
+        collects: 32,
         liked: false,
         collected: false,
         ingredients: [
@@ -59,6 +69,7 @@ const mockDishes = [
         fat: 5.5,
         carbs: 6.2,
         likes: 56,
+        collects: 18,
         liked: false,
         collected: false,
         ingredients: [
@@ -94,6 +105,7 @@ const mockDishes = [
         fat: 2.5,
         carbs: 3.2,
         likes: 120,
+        collects: 45,
         liked: false,
         collected: true,
         ingredients: [
@@ -118,6 +130,7 @@ const mockDishes = [
         fat: 11.2,
         carbs: 8.5,
         likes: 42,
+        collects: 15,
         liked: false,
         collected: false,
         ingredients: [
@@ -153,6 +166,7 @@ const mockDishes = [
         fat: 1.5,
         carbs: 2.0,
         likes: 30,
+        collects: 8,
         liked: false,
         collected: false,
         ingredients: [
@@ -197,101 +211,208 @@ const fetchDishes = async () => {
   }
 }
 
-// 过滤后的菜谱列表
-const filteredDishes = computed(() => {
-  return dishesList.value.filter(dish => {
-    const matchesSearch = dish.dishName.toLowerCase().includes(searchQuery.value.toLowerCase())
-    const matchesCuisine = selectedCuisine.value === '全部' || dish.cuisineType === selectedCuisine.value
+// 将后端/Mock返回的菜品数据按做法分支（branch）展平为一维做法列表
+const flatRecipes = computed(() => {
+  const list: any[] = []
+  dishesList.value.forEach(dish => {
+    if (dish.branches && dish.branches.length > 0) {
+      dish.branches.forEach((branch: any) => {
+        list.push({
+          dishId: dish.dishId,
+          dishName: dish.dishName,
+          coverEmoji: dish.coverEmoji,
+          cuisineType: dish.cuisineType,
+          dietModeName: dish.dietModeName,
+          ...branch
+        })
+      })
+    } else {
+      list.push({
+        dishId: dish.dishId,
+        dishName: dish.dishName,
+        coverEmoji: dish.coverEmoji,
+        cuisineType: dish.cuisineType,
+        dietModeName: dish.dietModeName,
+        branchId: null,
+        branchName: '',
+        calories: 0,
+        protein: 0,
+        fat: 0,
+        carbs: 0,
+        likes: dish.totalLikes || 0,
+        liked: false,
+        collected: false,
+        ingredients: [],
+        steps: []
+      })
+    }
+  })
+  return list
+})
+
+// 过滤后的做法列表
+const filteredRecipes = computed(() => {
+  return flatRecipes.value.filter(recipe => {
+    const matchesSearch = recipe.dishName.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+        (recipe.branchName && recipe.branchName.toLowerCase().includes(searchQuery.value.toLowerCase()))
+    const matchesCuisine = selectedCuisine.value === '全部' || recipe.cuisineType === selectedCuisine.value
     return matchesSearch && matchesCuisine
   })
 })
 
-// 查看菜谱详情
-const openDishDetail = (dish: any) => {
-  currentDish.value = dish
-  // 默认激活点赞数最高的分支
-  if (dish.branches && dish.branches.length > 0) {
-    // 按照点赞数降序排行
-    const sorted = [...dish.branches].sort((a, b) => b.likes - a.likes)
-    activeBranchId.value = sorted[0].branchId
-  } else {
-    activeBranchId.value = null
-  }
+// 查看做法详情
+const openDishDetail = (recipe: any) => {
+  currentRecipe.value = recipe
   showDetail.value = true
 }
 
-// 获取当前激活的分支详情
-const activeBranch = computed(() => {
-  if (!currentDish.value || !activeBranchId.value) return null
-  return currentDish.value.branches.find((b: any) => b.branchId === activeBranchId.value)
-})
-
-// 分支按点赞热度排序输出
-const sortedBranches = computed(() => {
-  if (!currentDish.value || !currentDish.value.branches) return []
-  return [...currentDish.value.branches].sort((a, b) => b.likes - a.likes)
-})
-
 // 红心点赞（防重）
-const handleLike = async (branch: any) => {
-  if (branch.liked) {
-    // 取消赞
+const handleLike = async (recipe: any) => {
+  if (recipe.liked) {
     try {
-      if (!roleStore.token?.startsWith('mock-')) {
-        await request.post(`/api/diet/dish/like/cancel?branchId=${branch.branchId}`)
+      if (!roleStore.token?.startsWith('mock-') && recipe.branchId) {
+        await request.post(`/api/diet/dish/like/cancel?branchId=${recipe.branchId}`)
       }
-      branch.likes--
-      branch.liked = false
+      recipe.likes--
+      recipe.liked = false
       showToast('已取消点赞')
     } catch (err) {
-      branch.likes--
-      branch.liked = false
+      recipe.likes--
+      recipe.liked = false
     }
   } else {
-    // 点赞
     try {
-      if (!roleStore.token?.startsWith('mock-')) {
-        await request.post(`/api/diet/dish/like/add?branchId=${branch.branchId}`)
+      if (!roleStore.token?.startsWith('mock-') && recipe.branchId) {
+        await request.post(`/api/diet/dish/like/add?branchId=${recipe.branchId}`)
       }
-      branch.likes++
-      branch.liked = true
+      recipe.likes++
+      recipe.liked = true
       showSuccessToast('点赞成功！❤️')
     } catch (err) {
-      branch.likes++
-      branch.liked = true
+      recipe.likes++
+      recipe.liked = true
       showSuccessToast('已点赞 ❤️')
     }
-  }
-  // 重新累加主菜品的总赞数
-  if (currentDish.value) {
-    currentDish.value.totalLikes = currentDish.value.branches.reduce((sum: number, b: any) => sum + b.likes, 0)
   }
 }
 
 // 金星收藏
-const handleCollect = async (branch: any) => {
-  if (branch.collected) {
+const handleCollect = async (recipe: any) => {
+  if (recipe.collected) {
     try {
-      if (!roleStore.token?.startsWith('mock-')) {
-        await request.post(`/api/diet/dish/collect/cancel?branchId=${branch.branchId}`)
+      if (!roleStore.token?.startsWith('mock-') && recipe.branchId) {
+        await request.post(`/api/diet/dish/collect/cancel?branchId=${recipe.branchId}`)
       }
-      branch.collected = false
+      recipe.collects = Math.max(0, (recipe.collects || 0) - 1)
+      recipe.collected = false
       showToast('已取消收藏')
     } catch (err) {
-      branch.collected = false
+      recipe.collects = Math.max(0, (recipe.collects || 0) - 1)
+      recipe.collected = false
     }
   } else {
     try {
-      if (!roleStore.token?.startsWith('mock-')) {
-        await request.post(`/api/diet/dish/collect/add?branchId=${branch.branchId}`)
+      if (!roleStore.token?.startsWith('mock-') && recipe.branchId) {
+        await request.post(`/api/diet/dish/collect/add?branchId=${recipe.branchId}`)
       }
-      branch.collected = true
+      recipe.collects = (recipe.collects || 0) + 1
+      recipe.collected = true
       showSuccessToast('已存入收藏夹 ⭐')
     } catch (err) {
-      branch.collected = true
+      recipe.collects = (recipe.collects || 0) + 1
+      recipe.collected = true
       showSuccessToast('收藏成功 ⭐')
     }
   }
+}
+
+// 用餐人快捷加入心愿单
+const quickAddWish = (recipe: any) => {
+  wishForm.value.dishId = recipe.dishId
+  wishForm.value.branchId = recipe.branchId
+  // 拼接菜名与做法名，例如 "西兰花炒牛肉 (无油低卡健身版)"
+  wishForm.value.dishName = recipe.branchName
+      ? `${recipe.dishName} (${recipe.branchName})`
+      : recipe.dishName
+  wishForm.value.wishDate = new Date().toISOString().split('T')[0]
+  // 真实 API 时，默认备注里写明具体的做法名
+  wishForm.value.wishNote = recipe.branchName ? `做法偏好: ${recipe.branchName}` : ''
+  showWishDialog.value = true
+}
+
+// 提交心愿单
+const submitWish = async () => {
+  if (!wishForm.value.dishId) {
+    showToast('请选择菜品')
+    return
+  }
+  try {
+    if (roleStore.token?.startsWith('mock-')) {
+      const localWishes = JSON.parse(localStorage.getItem('mock_wishes') || '[]')
+      const newWish = {
+        id: Date.now(),
+        dishName: wishForm.value.dishName,
+        wishDate: wishForm.value.wishDate,
+        wishNote: wishForm.value.wishNote
+      }
+      localWishes.unshift(newWish)
+      localStorage.setItem('mock_wishes', JSON.stringify(localWishes))
+      showSuccessToast('已成功加入心愿单！')
+    } else {
+      await request.post('/api/diet/wish-dish/add', {
+        profileId: roleStore.profileId,
+        groupId: roleStore.groupId,
+        dishId: wishForm.value.dishId,
+        branchId: wishForm.value.branchId,
+        wishDate: wishForm.value.wishDate,
+        wishNote: wishForm.value.wishNote
+      })
+      showSuccessToast('已成功加入心愿单！')
+    }
+    showWishDialog.value = false
+  } catch (err) {
+    console.error(err)
+    showToast('加入心愿单失败')
+  }
+}
+
+// 用餐人快捷加入避坑单
+const quickAddDislike = (recipe: any) => {
+  showConfirmDialog({
+    title: '加入避坑单',
+    message: `确定要将“${recipe.dishName}”加入避坑单吗？`,
+  }).then(async () => {
+    try {
+      if (roleStore.token?.startsWith('mock-')) {
+        const localDislikes = JSON.parse(localStorage.getItem('mock_dislikes') || '[]')
+        // 避坑单以菜品名称来查找和增加
+        const existing = localDislikes.find((d: any) => d.dishName === recipe.dishName)
+        if (existing) {
+          existing.count++
+        } else {
+          localDislikes.unshift({
+            id: Date.now(),
+            dishName: recipe.dishName,
+            count: 1
+          })
+        }
+        localStorage.setItem('mock_dislikes', JSON.stringify(localDislikes))
+        showSuccessToast('已成功加入避坑单！')
+      } else {
+        await request.post('/api/diet/dislike-dish/add', {
+          profileId: roleStore.profileId,
+          groupId: roleStore.groupId,
+          dishId: recipe.dishId
+        })
+        showSuccessToast('已成功加入避坑单！')
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('操作失败')
+    }
+  }).catch(() => {
+    // 点击取消
+  })
 }
 
 onMounted(() => {
@@ -325,35 +446,65 @@ onMounted(() => {
 
     <!-- 菜谱大卡片瀑布流布局 -->
     <div class="dishes-container">
-      <div v-if="filteredDishes.length === 0" class="empty-box">
+      <div v-if="filteredRecipes.length === 0" class="empty-box">
         <van-empty image="search" description="暂无符合筛选的精美菜谱"/>
       </div>
 
       <div
-          v-for="dish in filteredDishes"
-          :key="dish.dishId"
+          v-for="recipe in filteredRecipes"
+          :key="recipe.branchId || recipe.dishId"
           class="dish-card card-shadow"
-          @click="openDishDetail(dish)"
+          @click="openDishDetail(recipe)"
       >
         <div class="card-bg-gradient"></div>
-        <div class="dish-emoji">{{ dish.coverEmoji || '🥗' }}</div>
+        <div class="dish-emoji">{{ recipe.coverEmoji || '🥗' }}</div>
 
         <div class="dish-content">
           <div class="dish-title-row">
-            <h3 class="dish-name">{{ dish.dishName }}</h3>
-            <span class="cuisine-badge">{{ dish.cuisineType }}</span>
+            <h3 class="dish-name">
+              {{ recipe.dishName }}
+              <span v-if="recipe.branchName" class="branch-name-suffix">({{ recipe.branchName }})</span>
+            </h3>
+            <span class="cuisine-badge">{{ recipe.cuisineType }}</span>
           </div>
 
           <div class="dish-detail-row">
-            <span class="mode-tag">{{ dish.dietModeName || '轻食减脂' }}</span>
-            <span class="branch-count-text">
-              ✨ 共有 {{ dish.branches?.length || 1 }} 个做法分支
-            </span>
+            <span class="mode-tag">{{ recipe.dietModeName || '轻食减脂' }}</span>
+            <span class="calories-badge">🔥 {{ recipe.calories }} kcal</span>
+          </div>
+
+          <!-- 用餐人快捷操作 -->
+          <div v-if="roleStore.role === 'diner'" class="diner-quick-actions" @click.stop>
+            <van-button
+                size="small"
+                type="primary"
+                plain
+                round
+                icon="plus"
+                class="action-btn"
+                @click="quickAddWish(recipe)"
+            >
+              想吃 (加心愿单)
+            </van-button>
+            <van-button
+                size="small"
+                type="warning"
+                plain
+                round
+                icon="close"
+                class="action-btn"
+                @click="quickAddDislike(recipe)"
+            >
+              避坑 (加避坑单)
+            </van-button>
           </div>
 
           <div class="dish-footer-row">
-            <span class="likes-total">❤️ {{ dish.totalLikes }} 次觉得赞</span>
-            <span class="arrow-text">查看分支做法 ➔</span>
+            <div class="stats-row">
+              <span class="likes-total">❤️ {{ recipe.likes }}</span>
+              <span class="collects-total">⭐ {{ recipe.collects || 0 }}</span>
+            </div>
+            <span class="arrow-text">查看烹饪指南 ➔</span>
           </div>
         </div>
       </div>
@@ -365,90 +516,83 @@ onMounted(() => {
         position="right"
         :style="{ width: '100%', height: '100%' }"
     >
-      <div class="popup-detail-container" v-if="currentDish">
+      <div class="popup-detail-container" v-if="currentRecipe">
         <!-- 头部导航与背景 -->
         <div class="popup-header">
           <van-icon name="arrow-left" class="back-icon" @click="showDetail = false"/>
-          <h2 class="popup-title">{{ currentDish.dishName }}</h2>
-          <span class="popup-cuisine-tag">{{ currentDish.cuisineType }}</span>
+          <h2 class="popup-title">
+            {{ currentRecipe.dishName }}
+            <span v-if="currentRecipe.branchName" class="popup-branch-title">({{ currentRecipe.branchName }})</span>
+          </h2>
+          <span class="popup-cuisine-tag">{{ currentRecipe.cuisineType }}</span>
         </div>
 
         <div class="popup-body">
-          <!-- 做法分支热度排行榜区 -->
-          <div class="branch-leaderboard-section">
-            <h3 class="section-title">🏆 做法热度排行榜</h3>
-            <p class="section-subtitle">做法分支按点赞数实时降序排列</p>
-
-            <div class="leaderboard-list">
-              <div
-                  v-for="(b, idx) in sortedBranches"
-                  :key="b.branchId"
-                  :class="['branch-rank-card', { active: activeBranchId === b.branchId }]"
-                  @click="activeBranchId = b.branchId"
-              >
-                <!-- 排名奖杯 -->
-                <div class="rank-badge">
-                  <span v-if="idx === 0">🥇</span>
-                  <span v-else-if="idx === 1">🥈</span>
-                  <span v-else-if="idx === 2">🥉</span>
-                  <span v-else class="normal-rank-num">#{{ idx + 1 }}</span>
-                </div>
-
-                <div class="rank-card-info">
-                  <h4 class="rank-name">{{ b.branchName }}</h4>
-                  <p class="rank-meta">
-                    创作者: {{ b.creatorName }} | {{ b.calories }} kcal
-                  </p>
-                </div>
-
-                <div class="rank-actions-status">
-                  <span class="rank-likes">❤️ {{ b.likes }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <!-- 当前做法的用料与步骤展示 -->
-          <div class="branch-detail-panel card-shadow" v-if="activeBranch">
+          <div class="branch-detail-panel card-shadow">
             <div class="panel-header-row">
               <div class="left">
                 <span class="sub-title">👨‍🍳 烹饪指南</span>
-                <h3 class="active-branch-title">{{ activeBranch.branchName }}</h3>
+                <h3 class="active-branch-title">{{ currentRecipe.branchName || currentRecipe.dishName }}</h3>
               </div>
               <div class="right-actions">
                 <van-icon
-                    :name="activeBranch.liked ? 'like' : 'like-o'"
-                    :color="activeBranch.liked ? '#e74c3c' : '#7f8c8d'"
+                    :name="currentRecipe.liked ? 'like' : 'like-o'"
+                    :color="currentRecipe.liked ? '#e74c3c' : '#7f8c8d'"
                     size="22"
                     class="action-icon"
-                    @click.stop="handleLike(activeBranch)"
+                    @click.stop="handleLike(currentRecipe)"
                 />
                 <van-icon
-                    :name="activeBranch.collected ? 'star' : 'star-o'"
-                    :color="activeBranch.collected ? '#f1c40f' : '#7f8c8d'"
+                    :name="currentRecipe.collected ? 'star' : 'star-o'"
+                    :color="currentRecipe.collected ? '#f1c40f' : '#7f8c8d'"
                     size="22"
                     class="action-icon"
-                    @click.stop="handleCollect(activeBranch)"
+                    @click.stop="handleCollect(currentRecipe)"
                 />
               </div>
             </div>
 
+            <!-- 用餐人快捷操作 (详情页) -->
+            <div v-if="roleStore.role === 'diner'" class="detail-diner-actions mt-16">
+              <van-button
+                  type="primary"
+                  block
+                  round
+                  icon="plus"
+                  class="detail-action-btn"
+                  @click="quickAddWish(currentRecipe)"
+              >
+                想吃 (加入心愿单)
+              </van-button>
+              <van-button
+                  type="warning"
+                  block
+                  round
+                  icon="close"
+                  class="detail-action-btn"
+                  @click="quickAddDislike(currentRecipe)"
+              >
+                避坑 (加入避坑单)
+              </van-button>
+            </div>
+
             <!-- 卡路里明细 -->
-            <div class="nutrition-strip">
+            <div class="nutrition-strip mt-16">
               <div class="nut-item">
-                <span class="n-val">{{ activeBranch.calories }}</span>
+                <span class="n-val">{{ currentRecipe.calories }}</span>
                 <span class="n-lbl">热量(kcal)</span>
               </div>
               <div class="nut-item border-l">
-                <span class="n-val">{{ activeBranch.protein }}g</span>
+                <span class="n-val">{{ currentRecipe.protein }}g</span>
                 <span class="n-lbl">蛋白质</span>
               </div>
               <div class="nut-item border-l">
-                <span class="n-val">{{ activeBranch.fat }}g</span>
+                <span class="n-val">{{ currentRecipe.fat }}g</span>
                 <span class="n-lbl">脂肪</span>
               </div>
               <div class="nut-item border-l">
-                <span class="n-val">{{ activeBranch.carbs }}g</span>
+                <span class="n-val">{{ currentRecipe.carbs }}g</span>
                 <span class="n-lbl">碳水</span>
               </div>
             </div>
@@ -456,9 +600,9 @@ onMounted(() => {
             <!-- 食材清单 -->
             <div class="ingredients-section mt-16">
               <h4 class="part-title">🛒 做法配料表</h4>
-              <div class="ingredients-grid">
+              <div class="ingredients-grid" v-if="currentRecipe.ingredients && currentRecipe.ingredients.length > 0">
                 <div
-                    v-for="ing in activeBranch.ingredients"
+                    v-for="ing in currentRecipe.ingredients"
                     :key="ing.name"
                     class="ing-item-card"
                 >
@@ -467,14 +611,15 @@ onMounted(() => {
                   <van-tag type="success" plain v-if="ing.isMain">主料</van-tag>
                 </div>
               </div>
+              <div v-else class="empty-tip-small">暂无食材清单数据</div>
             </div>
 
             <!-- 加工步骤 -->
             <div class="steps-section mt-16">
               <h4 class="part-title">🍳 加工及烹调步骤</h4>
-              <div class="steps-timeline">
+              <div class="steps-timeline" v-if="currentRecipe.steps && currentRecipe.steps.length > 0">
                 <div
-                    v-for="(step, sIdx) in activeBranch.steps"
+                    v-for="(step, sIdx) in currentRecipe.steps"
                     :key="sIdx"
                     class="step-timeline-item"
                 >
@@ -484,11 +629,45 @@ onMounted(() => {
                   </div>
                 </div>
               </div>
+              <div v-else class="empty-tip-small">暂无步骤说明</div>
             </div>
           </div>
         </div>
       </div>
     </van-popup>
+
+    <!-- 弹窗：用餐人快捷加入心愿单 -->
+    <van-dialog
+        v-model:show="showWishDialog"
+        title="我想吃点什么"
+        show-cancel-button
+        @confirm="submitWish"
+    >
+      <div class="dialog-form">
+        <van-field
+            v-model="wishForm.dishName"
+            readonly
+            label="菜品"
+            placeholder="加入的菜品名"
+        />
+        <van-field
+            v-model="wishForm.wishDate"
+            type="date"
+            label="期望日期"
+            placeholder="选择期望日期"
+        />
+        <van-field
+            v-model="wishForm.wishNote"
+            rows="2"
+            autosize
+            label="留言备注"
+            type="textarea"
+            maxlength="50"
+            placeholder="可以写微辣、少盐或者期望的做法..."
+            show-word-limit
+        />
+      </div>
+    </van-dialog>
   </div>
 </template>
 
@@ -925,5 +1104,82 @@ onMounted(() => {
   color: #2c3e50;
   line-height: 1.5;
   margin: 0;
+}
+
+/* 做法详情页面分支标题后缀 */
+.branch-name-suffix {
+  font-size: 11px;
+  color: #7f8c8d;
+  font-weight: normal;
+  margin-left: 4px;
+}
+
+.calories-badge {
+  font-size: 10px;
+  background: #fdf2e9;
+  color: #e67e22;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: bold;
+}
+
+/* 用餐人快捷操作栏 */
+.diner-quick-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #ebedf0;
+}
+
+.diner-quick-actions .action-btn {
+  flex: 1;
+  height: 32px;
+  font-size: 11px;
+}
+
+/* 详情 Popup 分支标题样式 */
+.popup-branch-title {
+  font-size: 12px;
+  color: #7f8c8d;
+  font-weight: normal;
+  margin-left: 4px;
+}
+
+/* 详情页用餐人快捷操作 */
+.detail-diner-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.detail-action-btn {
+  flex: 1;
+  height: 36px;
+  font-size: 12px;
+}
+
+/* 小提示与空数据提示 */
+.empty-tip-small {
+  font-size: 11px;
+  color: #bdc3c7;
+  text-align: center;
+  padding: 12px 0;
+}
+
+/* 对话框表单样式 */
+.dialog-form {
+  padding: 16px 8px;
+}
+
+.stats-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.collects-total {
+  font-size: 10px;
+  font-weight: bold;
+  color: #f1c40f;
 }
 </style>

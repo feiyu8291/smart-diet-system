@@ -1,13 +1,11 @@
 package com.diet.modules.biz.controller;
 
+import cn.hutool.core.collection.CollUtil;
 import com.diet.modules.biz.model.dto.DietMealCompleteDTO;
 import com.diet.modules.biz.model.dto.DietMealPlanSaveDTO;
 import com.diet.modules.biz.model.po.DietMealDetailQueryPO;
 import com.diet.modules.biz.model.po.DietMealRecommendQueryPO;
-import com.diet.modules.biz.model.vo.DietDayMealDetailVO;
-import com.diet.modules.biz.model.vo.DietDishBranchVO;
-import com.diet.modules.biz.model.vo.DietFamilyMealPlanVO;
-import com.diet.modules.biz.model.vo.DietMealDetailVO;
+import com.diet.modules.biz.model.vo.*;
 import com.diet.modules.biz.service.DietFamilyMealPlanService;
 import com.diet.modules.common.entity.Result;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,7 +13,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 联合配餐 Controller 接口类
@@ -31,6 +32,31 @@ import java.util.List;
 public class DietFamilyMealPlanController {
 
     private final DietFamilyMealPlanService familyMealPlanService;
+
+    @Operation(summary = "查询今日联合配餐计划详情")
+    @GetMapping("/current-day")
+    public Result<DietDayMealDetailVO> getCurrentDayMeal(@RequestParam Long groupId, @RequestParam String date) {
+        LocalDate localDate = LocalDate.parse(date);
+        DietDayMealDetailVO detail = familyMealPlanService.getDayMealDetail(groupId, localDate);
+        return Result.success(detail);
+    }
+
+    @Operation(summary = "查询今日家庭膳食采购清单列表")
+    @GetMapping("/grocery-list")
+    public Result<List<DietGroceryVO>> getGroceryList(@RequestParam Long groupId, @RequestParam String date) {
+        LocalDate localDate = LocalDate.parse(date);
+        DietDayMealDetailVO detail = familyMealPlanService.getDayMealDetail(groupId, localDate);
+        if (Objects.nonNull(detail) && CollUtil.isNotEmpty(detail.getDailyGroceries())) {
+            return Result.success(detail.getDailyGroceries());
+        }
+        return Result.success(Collections.emptyList());
+    }
+
+    @Operation(summary = "查询今日就餐打卡反馈列表")
+    @GetMapping("/feedback/list-today")
+    public Result<List<Object>> listTodayFeedback(@RequestParam Long profileId) {
+        return Result.success(Collections.emptyList());
+    }
 
     @Operation(summary = "查询避重冷却天数")
     @GetMapping("/cooldown")

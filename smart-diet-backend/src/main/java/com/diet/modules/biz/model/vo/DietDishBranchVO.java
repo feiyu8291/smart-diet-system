@@ -49,6 +49,27 @@ public class DietDishBranchVO {
     @Schema(description = "碳水 (g/100g)")
     private BigDecimal carbs;
 
+    @Schema(description = "主菜品ID")
+    private Long dishId;
+
+    @Schema(description = "主菜品名称")
+    private String dishName;
+
+    @Schema(description = "卡片专属特色标签")
+    private List<String> tags;
+
+    @Schema(description = "本做法点赞数")
+    private Integer likes;
+
+    @Schema(description = "本做法收藏数")
+    private Integer collects;
+
+    @Schema(description = "当前用户是否点赞")
+    private Boolean liked;
+
+    @Schema(description = "当前用户是否收藏")
+    private Boolean collected;
+
     @Schema(description = "原材料配方列表")
     private List<DietDishIngredientVO> ingredients;
 

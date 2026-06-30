@@ -24,7 +24,11 @@ public class DietUserWishDish extends BaseEntity {
     private Long groupId;
     @Schema(description = "菜谱ID")
     private Long dishId;
+    @Schema(description = "做法分支ID，可为 NULL")
+    private Long branchId;
     @Schema(description = "希望就餐日期，可为 NULL")
     private LocalDate wishDate;
+    @Schema(description = "心愿单留言备注")
+    private String wishNote;
 
 }

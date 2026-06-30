@@ -5,7 +5,7 @@
     <select id="selectRecipeStepsByBranchId" resultType="com.diet.modules.biz.model.vo.DietDishStepVO">
         SELECT
             r.step_num AS stepNum,
-            IFNULL(NULLIF(TRIM(r.custom_detail), ''), p.step_detail) AS stepDetail,
+            COALESCE(NULLIF(TRIM(r.custom_detail), ''), p.step_detail) AS stepDetail,
             r.duration_seconds AS durationSeconds,
             r.fire_power AS firePower
         FROM diet_dish_step_relation r

@@ -391,7 +391,9 @@ CREATE TABLE IF NOT EXISTS diet_user_wish_dish
     profile_id  BIGINT    NOT NULL,
     group_id    BIGINT    NOT NULL,
     dish_id     BIGINT    NOT NULL,
+    branch_id   BIGINT             DEFAULT NULL,
     wish_date   DATE               DEFAULT NULL,
+    wish_note   VARCHAR(255)       DEFAULT NULL,
     del_flag    SMALLINT  NOT NULL DEFAULT 0,
     create_by   VARCHAR(64),
     update_by   VARCHAR(64),
@@ -405,7 +407,9 @@ COMMENT ON COLUMN diet_user_wish_dish.wish_id IS '主键ID';
 COMMENT ON COLUMN diet_user_wish_dish.profile_id IS '就餐人档案ID(关联user_health_profile.profile_id)';
 COMMENT ON COLUMN diet_user_wish_dish.group_id IS '关联家庭组ID';
 COMMENT ON COLUMN diet_user_wish_dish.dish_id IS '关联想吃的菜品ID';
+COMMENT ON COLUMN diet_user_wish_dish.branch_id IS '关联具体做法分支ID';
 COMMENT ON COLUMN diet_user_wish_dish.wish_date IS '期望能吃上该菜品的指定日期(离线/在线做饭匹配)';
+COMMENT ON COLUMN diet_user_wish_dish.wish_note IS '想吃意向菜品留言备注(如口味、做法等)';
 COMMENT ON COLUMN diet_user_wish_dish.del_flag IS '删除标识(0否1是)';
 COMMENT ON COLUMN diet_user_wish_dish.create_by IS '创建人';
 COMMENT ON COLUMN diet_user_wish_dish.update_by IS '更新人';

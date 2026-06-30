@@ -29,7 +29,7 @@ const wishForm = ref({
   dishId: null as number | null,
   dishName: '',
   wishDate: new Date().toISOString().split('T')[0],
-  note: ''
+  wishNote: ''
 })
 
 // 忌口表单
@@ -75,14 +75,20 @@ const selectDish = (dish: any) => {
 const fetchLists = async () => {
   if (roleStore.token?.startsWith('mock-')) {
     // 模拟数据展示
-    wishList.value = [
+    const localWishes = JSON.parse(localStorage.getItem('mock_wishes') || '[]')
+    const localDislikes = JSON.parse(localStorage.getItem('mock_dislikes') || '[]')
+
+    const defaultWishes = [
       {id: 201, dishName: '红烧肉', wishDate: '2026-06-27', note: '周末想解解馋，吃一次放纵餐！'},
       {id: 202, dishName: '水煮鱼', wishDate: '2026-06-29', note: '想吃麻辣口的'}
     ]
-    dislikeList.value = [
+    const defaultDislikes = [
       {id: 301, dishName: '香菜拌牛肉', count: 1},
       {id: 302, dishName: '洋葱炒肉', count: 2}
     ]
+
+    wishList.value = [...localWishes, ...defaultWishes]
+    dislikeList.value = [...localDislikes, ...defaultDislikes]
     return
   }
 
@@ -108,12 +114,17 @@ const submitWish = async () => {
 
   try {
     if (roleStore.token?.startsWith('mock-')) {
-      wishList.value.unshift({
+      const localWishes = JSON.parse(localStorage.getItem('mock_wishes') || '[]')
+      const newWish = {
         id: Date.now(),
         dishName: wishForm.value.dishName,
         wishDate: wishForm.value.wishDate,
-        note: wishForm.value.note
-      })
+        wishNote: wishForm.value.wishNote
+      }
+      localWishes.unshift(newWish)
+      localStorage.setItem('mock_wishes', JSON.stringify(localWishes))
+
+      wishList.value.unshift(newWish)
       showSuccessToast('心愿提交成功')
     } else {
       await request.post('/api/diet/wish-dish/add', {
@@ -121,13 +132,13 @@ const submitWish = async () => {
         groupId: roleStore.groupId,
         dishId: wishForm.value.dishId,
         wishDate: wishForm.value.wishDate,
-        note: wishForm.value.note
+        wishNote: wishForm.value.wishNote
       })
       showSuccessToast('心愿提交成功')
       fetchLists()
     }
     showWishDialog.value = false
-    wishForm.value = {dishId: null, dishName: '', wishDate: new Date().toISOString().split('T')[0], note: ''}
+    wishForm.value = {dishId: null, dishName: '', wishDate: new Date().toISOString().split('T')[0], wishNote: ''}
   } catch (err) {
     console.error(err)
   }
@@ -141,16 +152,19 @@ const submitDislike = async () => {
 
   try {
     if (roleStore.token?.startsWith('mock-')) {
-      const existing = dislikeList.value.find(d => d.dishName === dislikeForm.value.dishName)
+      const localDislikes = JSON.parse(localStorage.getItem('mock_dislikes') || '[]')
+      const existing = localDislikes.find((d: any) => d.dishName === dislikeForm.value.dishName)
       if (existing) {
         existing.count++
       } else {
-        dislikeList.value.unshift({
+        localDislikes.unshift({
           id: Date.now(),
           dishName: dislikeForm.value.dishName,
           count: 1
         })
       }
+      localStorage.setItem('mock_dislikes', JSON.stringify(localDislikes))
+      fetchLists()
       showSuccessToast('不爱吃偏好已记录')
     } else {
       await request.post('/api/diet/dislike-dish/add', {
@@ -171,6 +185,10 @@ const submitDislike = async () => {
 const deleteWish = async (id: number) => {
   try {
     if (roleStore.token?.startsWith('mock-')) {
+      const localWishes = JSON.parse(localStorage.getItem('mock_wishes') || '[]')
+      const filtered = localWishes.filter((item: any) => item.id !== id)
+      localStorage.setItem('mock_wishes', JSON.stringify(filtered))
+
       wishList.value = wishList.value.filter(item => item.id !== id)
       showSuccessToast('已撤销心愿')
     } else {
@@ -186,6 +204,10 @@ const deleteWish = async (id: number) => {
 const deleteDislike = async (id: number) => {
   try {
     if (roleStore.token?.startsWith('mock-')) {
+      const localDislikes = JSON.parse(localStorage.getItem('mock_dislikes') || '[]')
+      const filtered = localDislikes.filter((item: any) => item.id !== id)
+      localStorage.setItem('mock_dislikes', JSON.stringify(filtered))
+
       dislikeList.value = dislikeList.value.filter(item => item.id !== id)
       showSuccessToast('已移除记录')
     } else {
@@ -220,7 +242,7 @@ onMounted(() => {
             <div class="item-left">
               <span class="dish-title">{{ item.dishName }}</span>
               <span class="wish-date">期望就餐日期: {{ item.wishDate }}</span>
-              <p class="wish-note" v-if="item.note">“{{ item.note }}”</p>
+              <p class="wish-note" v-if="item.wishNote">“{{ item.wishNote }}”</p>
             </div>
             <div class="tag-status">已提交</div>
           </div>
@@ -282,7 +304,7 @@ onMounted(() => {
             placeholder="选择期望日期"
         />
         <van-field
-            v-model="wishForm.note"
+            v-model="wishForm.wishNote"
             rows="2"
             autosize
             label="留言备注"

@@ -1,9 +1,13 @@
 package com.diet.modules.biz.controller;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.diet.modules.biz.model.dto.DietUserHealthProfileDTO;
+import com.diet.modules.biz.model.entity.DietFamilyGroup;
+import com.diet.modules.biz.model.entity.DietUserHealthProfile;
 import com.diet.modules.biz.model.po.DietUserHealthProfileQueryPO;
 import com.diet.modules.biz.model.vo.DietUserHealthProfileVO;
+import com.diet.modules.biz.service.DietFamilyGroupService;
 import com.diet.modules.biz.service.DietUserHealthProfileService;
 import com.diet.modules.common.entity.BaseDeleteDTO;
 import com.diet.modules.common.entity.Result;
@@ -13,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 成员健康档案 Controller 接口类
@@ -28,6 +33,48 @@ import java.util.List;
 public class DietUserHealthProfileController {
 
     private final DietUserHealthProfileService userHealthProfileService;
+    private final DietFamilyGroupService familyGroupService;
+
+    @Operation(summary = "查询单个成员健康档案详情")
+    @GetMapping("/{profileId}")
+    public Result<DietUserHealthProfileVO> getProfileById(@PathVariable("profileId") Long profileId) {
+        DietUserHealthProfile profile = userHealthProfileService.getById(profileId);
+        if (Objects.isNull(profile)) {
+            return Result.success(null);
+        }
+        DietUserHealthProfileVO vo = new DietUserHealthProfileVO();
+        BeanUtil.copyProperties(profile, vo);
+        if (Objects.nonNull(profile.getGroupId())) {
+            DietFamilyGroup group = familyGroupService.getById(profile.getGroupId());
+            if (Objects.nonNull(group)) {
+                vo.setGroupName(group.getGroupName());
+            }
+        }
+        return Result.success(vo);
+    }
+
+    @Operation(summary = "查询当前用户关联成员档案")
+    @GetMapping("/my-profile")
+    public Result<DietUserHealthProfileVO> getMyProfile() {
+        Long userId = com.diet.modules.common.util.SecurityUtils.getCurrentUserId();
+        DietUserHealthProfile profile = userHealthProfileService.lambdaQuery()
+                .eq(DietUserHealthProfile::getUserId, userId)
+                .eq(DietUserHealthProfile::getDelFlag, 0)
+                .last("LIMIT 1")
+                .one();
+        if (Objects.isNull(profile)) {
+            return Result.success(null);
+        }
+        DietUserHealthProfileVO vo = new DietUserHealthProfileVO();
+        BeanUtil.copyProperties(profile, vo);
+        if (Objects.nonNull(profile.getGroupId())) {
+            DietFamilyGroup group = familyGroupService.getById(profile.getGroupId());
+            if (Objects.nonNull(group)) {
+                vo.setGroupName(group.getGroupName());
+            }
+        }
+        return Result.success(vo);
+    }
 
     @Operation(summary = "查询家庭成员健康档案分页列表")
     @PostMapping("/page")
