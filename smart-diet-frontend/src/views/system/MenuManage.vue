@@ -1,6 +1,6 @@
 <template>
-  <div class="menu-manage">
-    <el-card>
+  <div class="content-container section-gap">
+    <el-card class="menu-manage-card">
       <!-- 统一的页面头部修饰栏 -->
       <div class="panel-header-section">
         <h3 class="page-title">
@@ -12,10 +12,24 @@
         <span class="sub-title">系统导航菜单及权限标识配置，支持配置目录、菜单、按钮及API级别的权限</span>
       </div>
 
-      <!-- 操作栏 -->
-      <div class="operation-bar">
-        <el-button type="primary" @click="handleAdd(null)">新增顶级菜单</el-button>
-        <el-button @click="handleExpandAll">{{ isExpandAll ? '折叠全部' : '展开全部' }}</el-button>
+      <!-- 操作栏（合并为单行展示） -->
+      <div class="search-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div>
+          <el-button @click="handleExpandAll">
+            <el-icon style="margin-right: 4px;">
+              <component :is="isExpandAll ? 'ArrowUp' : 'ArrowDown'"/>
+            </el-icon>
+            {{ isExpandAll ? '折叠全部' : '展开全部' }}
+          </el-button>
+        </div>
+        <div class="action-buttons">
+          <el-button type="primary" @click="handleAdd(null)">
+            <el-icon style="margin-right: 4px;">
+              <Plus/>
+            </el-icon>
+            新增顶级菜单
+          </el-button>
+        </div>
       </div>
 
       <!-- 数据表格 -->
@@ -26,7 +40,8 @@
           row-key="menuId"
           border
           :default-expand-all="isExpandAll"
-          style="width: 100%"
+          max-height="calc(100vh - 240px)"
+          style="width: 100%; margin-top: 10px"
           :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
       >
         <el-table-column prop="menuName" label="菜单名称" min-width="150"/>
@@ -297,8 +312,14 @@ const handleDelete = (row: any) => {
 </script>
 
 <style lang="scss" scoped>
-.menu-manage {
-  .operation-bar {
+.menu-manage-card {
+  .panel-header-section {
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+
+  .search-bar {
     margin-bottom: 20px;
   }
 }

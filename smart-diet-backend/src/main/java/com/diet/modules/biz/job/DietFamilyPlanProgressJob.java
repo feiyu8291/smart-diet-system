@@ -4,12 +4,10 @@ import com.diet.modules.biz.mapper.DietPlanMapper;
 import com.diet.modules.biz.model.entity.DietFamilyPlanProgress;
 import com.diet.modules.biz.model.entity.DietPlan;
 import com.diet.modules.biz.service.DietFamilyPlanProgressService;
-import org.quartz.JobExecutionContext;
-import org.quartz.JobExecutionException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.quartz.QuartzJobBean;
+import com.diet.modules.quartz.model.dto.QuartzJobEntityDTO;
+import com.diet.modules.quartz.service.IQuartzJobHandler;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -23,19 +21,16 @@ import java.util.List;
  * @author FeiYu
  * @date 2026-06-20
  */
-@Component
-public class DietFamilyPlanProgressJob extends QuartzJobBean {
+@Slf4j
+@Component("dietFamilyPlanProgressJob")
+@RequiredArgsConstructor
+public class DietFamilyPlanProgressJob implements IQuartzJobHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(DietFamilyPlanProgressJob.class);
-
-    @Autowired
-    private DietFamilyPlanProgressService familyPlanProgressService;
-
-    @Autowired
-    private DietPlanMapper dietPlanMapper;
+    private final DietFamilyPlanProgressService familyPlanProgressService;
+    private final DietPlanMapper dietPlanMapper;
 
     @Override
-    protected void executeInternal(JobExecutionContext context) throws JobExecutionException {
+    public String execute(QuartzJobEntityDTO jobDTO) {
         log.info("开始执行家庭膳食计划天数自动向前推进任务，时间: {}", LocalDateTime.now());
 
         List<DietFamilyPlanProgress> activeProgressList = familyPlanProgressService.lambdaQuery()
@@ -45,10 +40,12 @@ public class DietFamilyPlanProgressJob extends QuartzJobBean {
 
         if (activeProgressList.isEmpty()) {
             log.info("未发现进行中的家庭膳食计划，定时任务结束");
-            return;
+            return "未发现进行中的家庭膳食计划，执行结束。";
         }
 
         LocalDate today = LocalDate.now();
+        int successCount = 0;
+        int completeCount = 0;
 
         for (DietFamilyPlanProgress progress : activeProgressList) {
             try {
@@ -69,6 +66,7 @@ public class DietFamilyPlanProgressJob extends QuartzJobBean {
                     int totalDays = template.getTotalDays();
                     if (currentDay > totalDays) {
                         progress.setProgressStatus(2); // 标记完成
+                        completeCount++;
                         log.info("家庭组 {} 的计划 {} (第 {} 天) 超过模板总天数 {}，自动标记为已完成",
                                 progress.getGroupId(), progress.getPlanId(), currentDay, totalDays);
                     }
@@ -77,6 +75,7 @@ public class DietFamilyPlanProgressJob extends QuartzJobBean {
                 progress.setCurrentDay(currentDay);
                 progress.setUpdateTime(LocalDateTime.now());
                 familyPlanProgressService.updateById(progress);
+                successCount++;
 
                 log.info("成功更新家庭组 {} 的膳食计划进度，当前为第 {} 天", progress.getGroupId(), currentDay);
 
@@ -84,6 +83,8 @@ public class DietFamilyPlanProgressJob extends QuartzJobBean {
                 log.error("更新计划进度 ID: {} 发生异常: ", progress.getProgressId(), e);
             }
         }
-        log.info("家庭膳食计划天数自动推进任务执行完毕");
+        String resultMsg = String.format("家庭膳食计划天数自动推进完毕。更新成功: %d 个，自动标记完成: %d 个。", successCount, completeCount);
+        log.info(resultMsg);
+        return resultMsg;
     }
 }

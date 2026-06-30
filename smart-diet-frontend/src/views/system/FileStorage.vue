@@ -1,7 +1,7 @@
 <!-- src/views/system/FileStorage.vue - S3 文件存储管理 -->
 <template>
-  <div class="storage-container">
-    <el-card class="glass-card" shadow="never">
+  <div class="content-container section-gap">
+    <el-card class="storage-card">
       <div class="panel-header-section">
         <h3 class="page-title">
           <el-icon class="title-icon">
@@ -45,8 +45,9 @@
       <el-table
           v-loading="loading"
           :data="tableData"
-          class="custom-table"
-          style="width:100%"
+          border
+          max-height="calc(100vh - 240px)"
+          style="width: 100%; margin-top: 10px"
           @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" align="center"/>
@@ -271,6 +272,14 @@ onMounted(fetchList);
 </script>
 
 <style lang="scss" scoped>
+.storage-card {
+  .panel-header-section {
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+}
+
 .preview-cell {
   display: flex;
   align-items: center;

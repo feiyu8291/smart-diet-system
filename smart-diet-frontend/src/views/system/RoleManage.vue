@@ -1,6 +1,6 @@
 <template>
-  <div class="role-manage">
-    <el-card>
+  <div class="content-container section-gap">
+    <el-card class="role-manage-card">
       <!-- 统一的页面头部修饰栏 -->
       <div class="panel-header-section">
         <h3 class="page-title">
@@ -12,23 +12,28 @@
         <span class="sub-title">管理系统中的角色权限体系，支持配置关联的功能菜单与资源权限</span>
       </div>
 
-      <!-- 搜索栏 -->
-      <div class="search-bar">
-        <el-form :inline="true" :model="searchParams">
+      <!-- 搜索与操作栏（合并为单行展示） -->
+      <div class="search-bar" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+        <el-form :inline="true" :model="searchParams" style="margin-bottom: 0;">
           <el-form-item label="角色名称">
-            <el-input v-model="searchParams.roleName" placeholder="请输入角色名称" clearable/>
+            <el-input v-model="searchParams.roleName" placeholder="请输入角色名称" clearable style="width: 180px;"/>
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleSearch">搜索</el-button>
             <el-button @click="resetSearch">重置</el-button>
           </el-form-item>
         </el-form>
-      </div>
-
-      <!-- 操作栏 -->
-      <div class="operation-bar">
-        <el-button type="primary" @click="handleAdd">新增角色</el-button>
-        <el-button type="danger" :disabled="selectedIds.length === 0" @click="handleBatchDelete">批量删除</el-button>
+        <div class="action-buttons" style="display: flex; gap: 8px;">
+          <el-button type="primary" @click="handleAdd">
+            <el-icon style="margin-right: 4px;">
+              <Plus/>
+            </el-icon>
+            新增角色
+          </el-button>
+          <el-button type="danger" :disabled="selectedIds.length === 0" @click="handleBatchDelete">
+            批量删除
+          </el-button>
+        </div>
       </div>
 
       <!-- 数据表格 -->
@@ -37,7 +42,8 @@
           :data="tableData"
           @selection-change="handleSelectionChange"
           border
-          style="width: 100%"
+          max-height="calc(100vh - 240px)"
+          style="width: 100%; margin-top: 10px"
       >
         <el-table-column type="selection" width="55" align="center"/>
         <el-table-column prop="roleName" label="角色名称" width="160"/>
@@ -394,12 +400,14 @@ const resetMenuForm = () => {
 </script>
 
 <style lang="scss" scoped>
-.role-manage {
-  .search-bar {
+.role-manage-card {
+  .panel-header-section {
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 16px;
     margin-bottom: 20px;
   }
 
-  .operation-bar {
+  .search-bar {
     margin-bottom: 20px;
   }
 

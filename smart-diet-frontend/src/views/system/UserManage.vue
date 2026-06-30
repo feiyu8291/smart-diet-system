@@ -1,6 +1,6 @@
 <template>
-  <div class="user-manage">
-    <el-card>
+  <div class="content-container section-gap">
+    <el-card class="user-manage-card">
       <!-- 统一的页面头部修饰栏 -->
       <div class="panel-header-section">
         <h3 class="page-title">
@@ -12,20 +12,20 @@
         <span class="sub-title">系统用户及组织架构管理，负责分配登录账号、关联所属角色</span>
       </div>
 
-      <!-- 搜索栏 -->
-      <div class="search-bar">
-        <el-form :inline="true" :model="searchParams">
+      <!-- 搜索与操作栏（合并为单行展示） -->
+      <div class="search-bar" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+        <el-form :inline="true" :model="searchParams" style="margin-bottom: 0;">
           <el-form-item label="用户名">
-            <el-input v-model="searchParams.username" placeholder="请输入用户名" clearable/>
+            <el-input v-model="searchParams.username" placeholder="请输入用户名" clearable style="width: 150px;"/>
           </el-form-item>
           <el-form-item label="姓名">
-            <el-input v-model="searchParams.realName" placeholder="请输入姓名" clearable/>
+            <el-input v-model="searchParams.realName" placeholder="请输入姓名" clearable style="width: 150px;"/>
           </el-form-item>
           <el-form-item label="手机号">
-            <el-input v-model="searchParams.phoneNum" placeholder="请输入手机号" clearable/>
+            <el-input v-model="searchParams.phoneNum" placeholder="请输入手机号" clearable style="width: 150px;"/>
           </el-form-item>
           <el-form-item label="状态">
-            <el-select v-model="searchParams.useStatus" placeholder="请选择状态" clearable>
+            <el-select v-model="searchParams.useStatus" placeholder="请选择状态" clearable style="width: 120px;">
               <el-option label="启用" :value="0"/>
               <el-option label="禁用" :value="1"/>
             </el-select>
@@ -35,12 +35,17 @@
             <el-button @click="resetSearch">重置</el-button>
           </el-form-item>
         </el-form>
-      </div>
-
-      <!-- 操作栏 -->
-      <div class="operation-bar">
-        <el-button type="primary" @click="handleAdd">新增用户</el-button>
-        <el-button type="danger" :disabled="selectedIds.length === 0" @click="handleBatchDelete">批量删除</el-button>
+        <div class="action-buttons" style="display: flex; gap: 8px;">
+          <el-button type="primary" @click="handleAdd">
+            <el-icon style="margin-right: 4px;">
+              <Plus/>
+            </el-icon>
+            新增用户
+          </el-button>
+          <el-button type="danger" :disabled="selectedIds.length === 0" @click="handleBatchDelete">
+            批量删除
+          </el-button>
+        </div>
       </div>
 
       <!-- 数据表格 -->
@@ -49,7 +54,8 @@
           :data="tableData"
           @selection-change="handleSelectionChange"
           border
-          style="width: 100%"
+          max-height="calc(100vh - 240px)"
+          style="width: 100%; margin-top: 10px"
       >
         <el-table-column type="selection" width="55" align="center"/>
         <el-table-column prop="username" label="用户名"/>
@@ -181,16 +187,7 @@
 <script setup lang="ts">
 import {onMounted, reactive, ref} from 'vue';
 import {ElMessage, ElMessageBox} from 'element-plus';
-import {
-  deleteUser,
-  getAllRoles,
-  getUserPage,
-  resetUserPassword,
-  saveUser,
-  updateUser,
-  updateUserStatus,
-  getPublicKey
-} from '../../api/system';
+import {deleteUser, getAllRoles, getPublicKey, getUserPage, resetUserPassword, saveUser, updateUser, updateUserStatus} from '../../api/system';
 import JSEncrypt from 'jsencrypt';
 
 // 查询参数
@@ -465,12 +462,14 @@ const handleResetPassword = (row: any) => {
 </script>
 
 <style lang="scss" scoped>
-.user-manage {
-  .search-bar {
+.user-manage-card {
+  .panel-header-section {
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 16px;
     margin-bottom: 20px;
   }
 
-  .operation-bar {
+  .search-bar {
     margin-bottom: 20px;
   }
 

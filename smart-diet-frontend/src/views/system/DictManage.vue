@@ -1,6 +1,6 @@
 <template>
-  <div class="dict-manage">
-    <el-card>
+  <div class="content-container section-gap">
+    <el-card class="dict-manage-card">
       <!-- 统一的页面头部修饰栏 -->
       <div class="panel-header-section">
         <h3 class="page-title">
@@ -12,12 +12,12 @@
         <span class="sub-title">系统基础性数据字典值维护，方便全局统一管理下拉值选项与语义代码映射</span>
       </div>
 
-      <!-- 搜索栏 -->
-      <div class="search-bar">
-        <el-form :inline="true" :model="searchParams">
+      <!-- 搜索与操作栏（合并为单行展示） -->
+      <div class="search-bar" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+        <el-form :inline="true" :model="searchParams" style="margin-bottom: 0;">
           <el-form-item label="字典类型">
             <el-select v-model="searchParams.dataType" placeholder="请选择或输入字典类型" clearable filterable
-                       allow-create style="width: 220px">
+                       allow-create style="width: 200px">
               <el-option
                   v-for="item in dataTypeList"
                   :key="item.dataType"
@@ -27,20 +27,30 @@
             </el-select>
           </el-form-item>
           <el-form-item label="字典名称">
-            <el-input v-model="searchParams.dataCode" placeholder="请输入字典名称" clearable/>
+            <el-input v-model="searchParams.dataCode" placeholder="请输入字典名称" clearable style="width: 150px;"/>
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleSearch">搜索</el-button>
             <el-button @click="resetSearch">重置</el-button>
           </el-form-item>
         </el-form>
-      </div>
-
-      <!-- 操作栏 -->
-      <div class="operation-bar">
-        <el-button type="primary" @click="handleAdd">新增字典</el-button>
-        <el-button type="warning" @click="handleRefreshCache" :loading="refreshLoading">刷新缓存</el-button>
-        <el-button type="danger" :disabled="selectedIds.length === 0" @click="handleBatchDelete">批量删除</el-button>
+        <div class="action-buttons" style="display: flex; gap: 8px;">
+          <el-button type="primary" @click="handleAdd">
+            <el-icon style="margin-right: 4px;">
+              <Plus/>
+            </el-icon>
+            新增字典
+          </el-button>
+          <el-button type="warning" @click="handleRefreshCache" :loading="refreshLoading">
+            <el-icon style="margin-right: 4px;">
+              <Refresh/>
+            </el-icon>
+            刷新缓存
+          </el-button>
+          <el-button type="danger" :disabled="selectedIds.length === 0" @click="handleBatchDelete">
+            批量删除
+          </el-button>
+        </div>
       </div>
 
       <!-- 数据表格 -->
@@ -49,7 +59,8 @@
           :data="tableData"
           @selection-change="handleSelectionChange"
           border
-          style="width: 100%"
+          max-height="calc(100vh - 240px)"
+          style="width: 100%; margin-top: 10px"
       >
         <el-table-column type="selection" width="55" align="center"/>
         <el-table-column prop="dataTypeName" label="类型名称"/>
@@ -191,16 +202,7 @@
 <script setup lang="ts">
 import {onMounted, reactive, ref} from 'vue';
 import {ElMessage, ElMessageBox} from 'element-plus';
-import {
-  deleteDict,
-  getDataTypeAll,
-  getDictChildren,
-  getDictPage,
-  getFirstLevelDicts,
-  refreshDictCache,
-  saveDict,
-  updateDict
-} from '../../api/system';
+import {deleteDict, getDataTypeAll, getDictChildren, getDictPage, getFirstLevelDicts, refreshDictCache, saveDict, updateDict} from '../../api/system';
 
 // 查询参数
 const searchParams = reactive({
@@ -515,12 +517,14 @@ const handleRefreshCache = async () => {
 </script>
 
 <style lang="scss" scoped>
-.dict-manage {
-  .search-bar {
+.dict-manage-card {
+  .panel-header-section {
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 16px;
     margin-bottom: 20px;
   }
 
-  .operation-bar {
+  .search-bar {
     margin-bottom: 20px;
   }
 

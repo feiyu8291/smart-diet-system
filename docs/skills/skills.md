@@ -20,17 +20,18 @@
 ### 1.2 规范使用示例
 
 ```java
+
 @RestController
 @RequestMapping("/api/example")
 public class ExampleController {
-    
+
     // 成功返回
     @GetMapping("/get")
     public Result<ExampleVO> getDetail(@RequestParam Long id) {
         ExampleVO vo = exampleService.getDetailById(id);
         return Result.success(vo);
     }
-    
+
     // 失败/异常处理由全局拦截器自动捕获并封装为 Result.failed(code, message)
 }
 ```
@@ -89,6 +90,7 @@ public class ExampleController {
 ### 3.2 实体类规范代码结构
 
 ```java
+
 @Schema(description = "用户信息表")
 @Data
 @EqualsAndHashCode(callSuper = true)

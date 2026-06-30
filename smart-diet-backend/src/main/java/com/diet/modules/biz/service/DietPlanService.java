@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -33,7 +34,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DietPlanService extends ServiceImpl<DietPlanMapper, DietPlan> {
 
-    private final DietPlanMapper dietPlanMapper;
     private final DietFamilyPlanProgressService familyPlanProgressService;
     private final DietWeightRecordService weightRecordService;
     private final DietUserHealthProfileService userHealthProfileService;
@@ -43,7 +43,6 @@ public class DietPlanService extends ServiceImpl<DietPlanMapper, DietPlan> {
      */
     public List<DietPlanVO> getTemplates() {
         List<DietPlan> list = this.lambdaQuery()
-                .eq(DietPlan::getDelFlag, 0)
                 .list();
         return list.stream().map(entity -> {
             DietPlanVO vo = new DietPlanVO();
@@ -61,14 +60,13 @@ public class DietPlanService extends ServiceImpl<DietPlanMapper, DietPlan> {
         DietFamilyPlanProgress progress = familyPlanProgressService.lambdaQuery()
                 .eq(DietFamilyPlanProgress::getGroupId, groupId)
                 .eq(DietFamilyPlanProgress::getProgressStatus, 1)
-                .eq(DietFamilyPlanProgress::getDelFlag, 0)
                 .one();
 
-        if (progress != null) {
+        if (Objects.nonNull(progress)) {
             vo.setHasActivePlan(true);
             vo.setProgress(progress);
 
-            DietPlan plan = dietPlanMapper.selectById(progress.getPlanId());
+            DietPlan plan = this.baseMapper.selectById(progress.getPlanId());
             vo.setTemplate(plan);
         } else {
             vo.setHasActivePlan(false);
@@ -81,7 +79,7 @@ public class DietPlanService extends ServiceImpl<DietPlanMapper, DietPlan> {
      */
     @Transactional(rollbackFor = Exception.class)
     public Boolean startPlan(DietStartPlanDTO dto) {
-        if (dto == null || dto.getGroupId() == null || dto.getPlanId() == null) {
+        if (Objects.isNull(dto) || Objects.isNull(dto.getGroupId()) || Objects.isNull(dto.getPlanId())) {
             return false;
         }
 
@@ -90,7 +88,7 @@ public class DietPlanService extends ServiceImpl<DietPlanMapper, DietPlan> {
                 .eq(DietFamilyPlanProgress::getGroupId, dto.getGroupId())
                 .eq(DietFamilyPlanProgress::getProgressStatus, 1)
                 .one();
-        if (active != null) {
+        if (Objects.nonNull(active)) {
             active.setProgressStatus(3);
             active.setUpdateTime(LocalDateTime.now());
             familyPlanProgressService.updateById(active);
@@ -113,7 +111,7 @@ public class DietPlanService extends ServiceImpl<DietPlanMapper, DietPlan> {
      */
     @Transactional(rollbackFor = Exception.class)
     public Boolean recordWeight(DietWeightRecordDTO dto) {
-        if (dto == null || dto.getProfileId() == null || dto.getRecordWeight() == null) {
+        if (Objects.isNull(dto) || Objects.isNull(dto.getProfileId()) || Objects.isNull(dto.getRecordWeight())) {
             return false;
         }
 
@@ -124,11 +122,13 @@ public class DietPlanService extends ServiceImpl<DietPlanMapper, DietPlan> {
         record.setDelFlag(0);
 
         boolean inserted = weightRecordService.save(record);
-        if (!inserted) return false;
+        if (!inserted) {
+            return false;
+        }
 
         // 同步修改成员健康档案的当前体重项
         DietUserHealthProfile profile = userHealthProfileService.getById(dto.getProfileId());
-        if (profile != null) {
+        if (Objects.nonNull(profile)) {
             profile.setMemberWeight(dto.getRecordWeight());
             userHealthProfileService.saveOrUpdateProfile(profile);
         }
@@ -142,7 +142,6 @@ public class DietPlanService extends ServiceImpl<DietPlanMapper, DietPlan> {
     public List<DietWeightRecordVO> getWeightHistory(Long profileId) {
         List<DietWeightRecord> list = weightRecordService.lambdaQuery()
                 .eq(DietWeightRecord::getProfileId, profileId)
-                .eq(DietWeightRecord::getDelFlag, 0)
                 .orderByAsc(DietWeightRecord::getRecordDate)
                 .list();
         return list.stream().map(entity -> {

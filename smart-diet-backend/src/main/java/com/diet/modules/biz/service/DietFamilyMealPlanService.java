@@ -6,7 +6,10 @@ import com.diet.modules.biz.mapper.DietDishIngredientMapper;
 import com.diet.modules.biz.mapper.DietDishStepRelationMapper;
 import com.diet.modules.biz.mapper.DietFamilyMealPlanMapper;
 import com.diet.modules.biz.model.entity.*;
+import com.diet.modules.biz.model.po.DietMealDetailQueryPO;
+import com.diet.modules.biz.model.po.DietMealRecommendQueryPO;
 import com.diet.modules.biz.model.vo.*;
+import com.diet.modules.common.util.WeightedRandomUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,8 +54,8 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
     /**
      * 高阶入口：生成家庭联合配餐推荐并转换为 VO
      */
-    public List<DietDishBranchVO> getRecommendations(com.diet.modules.biz.model.po.DietMealRecommendQueryPO po) {
-        if (po == null || po.getGroupId() == null || po.getTargetDate() == null) {
+    public List<DietDishBranchVO> getRecommendations(DietMealRecommendQueryPO po) {
+        if (Objects.isNull(po) || Objects.isNull(po.getGroupId()) || Objects.isNull(po.getTargetDate())) {
             return new ArrayList<>();
         }
         LocalDate date = LocalDate.parse(po.getTargetDate());
@@ -61,27 +64,40 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
             DietDishBranchVO vo = new DietDishBranchVO();
             BeanUtil.copyProperties(b, vo);
             return vo;
-        }).collect(Collectors.toList());
+        }).toList();
     }
 
-    /**
-     * 生成家庭联合配餐推荐 (以做法分支为颗粒度)
-     */
-    public List<DietDishCookingBranch> generateRecommendedMeal(Long groupId, LocalDate targetDate, Integer mealPeriod, Integer dietMode, int limit) {
-        List<DietDishCookingBranch> allBranches = dishCookingBranchService.lambdaQuery()
-                .eq(DietDishCookingBranch::getDietMode, dietMode)
-                .eq(DietDishCookingBranch::getDelFlag, 0)
-                .list();
-        if (allBranches.isEmpty()) {
-            return new ArrayList<>();
-        }
+    private static class RecommendContext {
+        private final DietFamilyGroup group;
+        private final List<DietUserHealthProfile> profiles;
+        private final Set<String> cooledCuisines;
+        private final Set<Long> skilledDishIds;
+        private final Map<Long, DietCookDishStat> statMap;
+        private final Set<String> skilledCuisines;
+        private final List<DietUserWishDish> wishes;
+        private final Map<Long, Integer> dislikeMap;
 
+        public RecommendContext(DietFamilyGroup group, List<DietUserHealthProfile> profiles,
+                                Set<String> cooledCuisines, Set<Long> skilledDishIds,
+                                Map<Long, DietCookDishStat> statMap, Set<String> skilledCuisines,
+                                List<DietUserWishDish> wishes, Map<Long, Integer> dislikeMap) {
+            this.group = group;
+            this.profiles = profiles;
+            this.cooledCuisines = cooledCuisines;
+            this.skilledDishIds = skilledDishIds;
+            this.statMap = statMap;
+            this.skilledCuisines = skilledCuisines;
+            this.wishes = wishes;
+            this.dislikeMap = dislikeMap;
+        }
+    }
+
+    private RecommendContext loadRecommendContext(Long groupId, LocalDate targetDate) {
         DietFamilyGroup group = familyGroupService.getById(groupId);
-        int cooldownDays = (group != null) ? group.getCooldownDays() : 7;
+        int cooldownDays = Objects.nonNull(group) ? group.getCooldownDays() : 7;
 
         List<DietUserHealthProfile> profiles = userHealthProfileService.lambdaQuery()
                 .eq(DietUserHealthProfile::getGroupId, groupId)
-                .eq(DietUserHealthProfile::getDelFlag, 0)
                 .list();
 
         Set<String> cooledCuisines = getCooledCuisines(groupId, targetDate, cooldownDays);
@@ -91,24 +107,49 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         Map<Long, DietCookDishStat> statMap = getCookDishStatMap(cookUserId);
         Set<String> skilledCuisines = getSkilledCuisines(cookUserId, skilledDishIds);
 
-        List<Long> profileIds = profiles.stream().map(DietUserHealthProfile::getProfileId).collect(Collectors.toList());
+        List<Long> profileIds = profiles.stream().map(DietUserHealthProfile::getProfileId).toList();
         List<DietUserWishDish> wishes = getWishes(profileIds);
         Map<Long, Integer> dislikeMap = getDislikeMap(profileIds);
 
+        return new RecommendContext(group, profiles, cooledCuisines, skilledDishIds, statMap, skilledCuisines, wishes, dislikeMap);
+    }
+
+    private Map<DietDishCookingBranch, Double> calculateBranchWeights(RecommendContext context,
+                                                                      List<DietDishCookingBranch> allBranches,
+                                                                      LocalDate targetDate) {
         Map<DietDishCookingBranch, Double> branchWeights = new HashMap<>();
         for (DietDishCookingBranch branch : allBranches) {
-            double w = calculateBranchWeight(branch, targetDate, cooledCuisines, wishes, skilledDishIds, skilledCuisines, statMap, dislikeMap);
+            double w = calculateBranchWeight(branch, targetDate, context.cooledCuisines,
+                    context.wishes, context.skilledDishIds, context.skilledCuisines,
+                    context.statMap, context.dislikeMap);
             if (w > 0.0) {
                 branchWeights.put(branch, w);
             }
         }
+        return branchWeights;
+    }
+
+    /**
+     * 生成家庭联合配餐推荐 (以做法分支为颗粒度)
+     */
+    public List<DietDishCookingBranch> generateRecommendedMeal(Long groupId, LocalDate targetDate, Integer mealPeriod, Integer dietMode, int limit) {
+        List<DietDishCookingBranch> allBranches = dishCookingBranchService.lambdaQuery()
+                .eq(DietDishCookingBranch::getDietMode, dietMode)
+                .list();
+        if (allBranches.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        RecommendContext context = loadRecommendContext(groupId, targetDate);
+        Map<DietDishCookingBranch, Double> branchWeights = calculateBranchWeights(context, allBranches, targetDate);
 
         // 补足推荐限制数量
         if (branchWeights.size() < limit) {
-            fillBackupBranches(branchWeights, allBranches, targetDate, wishes, skilledDishIds, skilledCuisines, statMap, dislikeMap);
+            fillBackupBranches(branchWeights, allBranches, targetDate, context.wishes,
+                    context.skilledDishIds, context.skilledCuisines, context.statMap, context.dislikeMap);
         }
 
-        return com.diet.modules.common.util.WeightedRandomUtil.selectWithoutReplacement(branchWeights, limit);
+        return WeightedRandomUtil.selectWithoutReplacement(branchWeights, limit);
     }
 
     private Set<String> getCooledCuisines(Long groupId, LocalDate targetDate, int cooldownDays) {
@@ -122,21 +163,19 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         List<DietFamilyMealPlan> pastPlans = this.lambdaQuery()
                 .eq(DietFamilyMealPlan::getGroupId, groupId)
                 .between(DietFamilyMealPlan::getMealDate, startDate, endDate)
-                .eq(DietFamilyMealPlan::getDelFlag, 0)
                 .list();
 
         if (pastPlans.isEmpty()) {
             return cooledCuisines;
         }
 
-        List<Long> planIds = pastPlans.stream().map(DietFamilyMealPlan::getMealPlanId).collect(Collectors.toList());
+        List<Long> planIds = pastPlans.stream().map(DietFamilyMealPlan::getMealPlanId).toList();
         List<DietFamilyMealPlanDish> pastRelations = familyMealPlanDishService.lambdaQuery()
                 .in(DietFamilyMealPlanDish::getMealPlanId, planIds)
-                .eq(DietFamilyMealPlanDish::getDelFlag, 0)
                 .list();
 
         if (!pastRelations.isEmpty()) {
-            List<Long> pastBranchIds = pastRelations.stream().map(DietFamilyMealPlanDish::getBranchId).collect(Collectors.toList());
+            List<Long> pastBranchIds = pastRelations.stream().map(DietFamilyMealPlanDish::getBranchId).toList();
             List<DietDishCookingBranch> pastBranches = dishCookingBranchService.listByIds(pastBranchIds);
             cooledCuisines = pastBranches.stream().map(DietDishCookingBranch::getCuisineType).collect(Collectors.toSet());
         }
@@ -153,24 +192,22 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
     }
 
     private Set<Long> getSkilledDishIds(Long cookUserId) {
-        if (cookUserId == null) {
+        if (Objects.isNull(cookUserId)) {
             return new HashSet<>();
         }
         List<DietCookSkilledDish> skilledDishes = cookSkilledDishService.lambdaQuery()
                 .eq(DietCookSkilledDish::getUserId, cookUserId)
-                .eq(DietCookSkilledDish::getDelFlag, 0)
                 .list();
         return skilledDishes.stream().map(DietCookSkilledDish::getDishId).collect(Collectors.toSet());
     }
 
     private Map<Long, DietCookDishStat> getCookDishStatMap(Long cookUserId) {
         Map<Long, DietCookDishStat> statMap = new HashMap<>();
-        if (cookUserId == null) {
+        if (Objects.isNull(cookUserId)) {
             return statMap;
         }
         List<DietCookDishStat> stats = cookDishStatService.lambdaQuery()
                 .eq(DietCookDishStat::getUserId, cookUserId)
-                .eq(DietCookDishStat::getDelFlag, 0)
                 .list();
         for (DietCookDishStat stat : stats) {
             statMap.put(stat.getDishId(), stat);
@@ -180,11 +217,11 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
 
     private Set<String> getSkilledCuisines(Long cookUserId, Set<Long> skilledDishIds) {
         Set<String> skilledCuisines = new HashSet<>();
-        if (cookUserId == null || skilledDishIds.isEmpty()) {
+        if (Objects.isNull(cookUserId) || skilledDishIds.isEmpty()) {
             return skilledCuisines;
         }
         List<DietDishCookingBranch> skilledBranches = dishCookingBranchService.lambdaQuery()
-                .in(DietDishCookingBranch::getDishId, skilledDishIds).eq(DietDishCookingBranch::getDelFlag, 0).list();
+                .in(DietDishCookingBranch::getDishId, skilledDishIds).list();
 
         Map<String, Long> cuisineCounts = skilledBranches.stream()
                 .collect(Collectors.groupingBy(DietDishCookingBranch::getCuisineType, Collectors.counting()));
@@ -204,7 +241,6 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         }
         return userWishDishService.lambdaQuery()
                 .in(DietUserWishDish::getProfileId, profileIds)
-                .eq(DietUserWishDish::getDelFlag, 0)
                 .list();
     }
 
@@ -215,7 +251,6 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         }
         List<DietUserDislikeDish> dislikes = userDislikeDishService.lambdaQuery()
                 .in(DietUserDislikeDish::getProfileId, profileIds)
-                .eq(DietUserDislikeDish::getDelFlag, 0)
                 .list();
         for (DietUserDislikeDish d : dislikes) {
             dislikeMap.put(d.getDishId(), d.getDislikeCount());
@@ -236,7 +271,8 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         double wishBoost = 1.0;
         for (DietUserWishDish wish : wishes) {
             if (wish.getDishId().equals(dishId)) {
-                wishBoost = (wish.getWishDate() != null && wish.getWishDate().equals(targetDate)) ? Math.max(wishBoost, 3.0) : Math.max(wishBoost,
+                wishBoost = (Objects.nonNull(wish.getWishDate()) && wish.getWishDate().equals(targetDate)) ? Math.max(wishBoost, 3.0) : Math.max(
+                        wishBoost,
                         2.0);
             }
         }
@@ -287,8 +323,8 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
      */
     @Transactional(rollbackFor = Exception.class)
     public DietFamilyMealPlanVO saveMealPlan(com.diet.modules.biz.model.dto.DietMealPlanSaveDTO dto) {
-        if (dto == null || dto.getGroupId() == null || dto.getTargetDate() == null
-                || dto.getMealPeriod() == null || dto.getDietMode() == null || dto.getBranchIds() == null) {
+        if (Objects.isNull(dto) || Objects.isNull(dto.getGroupId()) || Objects.isNull(dto.getTargetDate())
+                || Objects.isNull(dto.getMealPeriod()) || Objects.isNull(dto.getDietMode()) || Objects.isNull(dto.getBranchIds())) {
             throw new RuntimeException("参数不完整，保存失败");
         }
         LocalDate date = LocalDate.parse(dto.getTargetDate());
@@ -304,10 +340,9 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
                 .eq(DietFamilyMealPlan::getGroupId, groupId)
                 .eq(DietFamilyMealPlan::getMealDate, targetDate)
                 .eq(DietFamilyMealPlan::getMealPeriod, mealPeriod)
-                .eq(DietFamilyMealPlan::getDelFlag, 0)
                 .one();
 
-        if (mealPlan != null) {
+        if (Objects.nonNull(mealPlan)) {
             mealPlan.setMealDietMode(dietMode);
             mealPlan.setUpdateTime(LocalDateTime.now());
             this.updateById(mealPlan);
@@ -360,7 +395,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
             rel.setBranchId(branchId);
             rel.setDelFlag(0);
             return rel;
-        }).collect(Collectors.toList());
+        }).toList();
         familyMealPlanDishService.saveBatch(rels);
     }
 
@@ -368,14 +403,15 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         int branchCount = branches.size();
         List<DietUserHealthProfile> profiles = userHealthProfileService.lambdaQuery()
                 .eq(DietUserHealthProfile::getGroupId, groupId)
-                .eq(DietUserHealthProfile::getDelFlag, 0)
                 .list();
 
         double periodRatio = (mealPeriod == 1 || mealPeriod == 3) ? 0.3 : 0.4;
         List<DietFamilyMealPortion> portionList = new ArrayList<>();
 
         for (DietUserHealthProfile p : profiles) {
-            if (p.getDailyTargetCalories() == null) continue;
+            if (Objects.isNull(p.getDailyTargetCalories())) {
+                continue;
+            }
             double mealCalBudget = p.getDailyTargetCalories().doubleValue() * periodRatio;
 
             for (DietDishCookingBranch branch : branches) {
@@ -399,14 +435,12 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         }
     }
 
-    private void generateGroceryList(Long mealPlanId, List<DietDishCookingBranch> branches) {
-        // 先汇总当前排餐计划中，每个分支被推荐食用的累计推荐质量 (recommendWeight 之和)
+    private Map<Long, BigDecimal> calculateBranchTotalWeights(Long mealPlanId, List<DietDishCookingBranch> branches) {
         Map<Long, BigDecimal> branchTotalWeights = new HashMap<>();
         for (DietDishCookingBranch branch : branches) {
             List<DietFamilyMealPortion> portions = familyMealPortionService.lambdaQuery()
                     .eq(DietFamilyMealPortion::getMealPlanId, mealPlanId)
                     .eq(DietFamilyMealPortion::getBranchId, branch.getBranchId())
-                    .eq(DietFamilyMealPortion::getDelFlag, 0)
                     .list();
             BigDecimal totalWeight = portions.stream()
                     .map(DietFamilyMealPortion::getRecommendWeight)
@@ -414,23 +448,33 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             branchTotalWeights.put(branch.getBranchId(), totalWeight);
         }
+        return branchTotalWeights;
+    }
 
+    private void generateGroceryList(Long mealPlanId, List<DietDishCookingBranch> branches) {
+        Map<Long, BigDecimal> branchTotalWeights = calculateBranchTotalWeights(mealPlanId, branches);
         Map<Long, BigDecimal> ingredientTotalGrams = new HashMap<>();
+
         for (DietDishCookingBranch branch : branches) {
             BigDecimal branchTotalWeight = branchTotalWeights.get(branch.getBranchId());
-            if (branchTotalWeight == null || branchTotalWeight.compareTo(BigDecimal.ZERO) <= 0) continue;
+            if (Objects.isNull(branchTotalWeight) || branchTotalWeight.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
 
             List<DietDishIngredient> recipeIngredients = dishIngredientService.lambdaQuery()
                     .eq(DietDishIngredient::getBranchId, branch.getBranchId())
-                    .eq(DietDishIngredient::getDelFlag, 0)
                     .list();
-            if (recipeIngredients.isEmpty()) continue;
+            if (recipeIngredients.isEmpty()) {
+                continue;
+            }
 
             double recipeTotalWeight = recipeIngredients.stream()
                     .mapToDouble(ri -> ri.getUseAmount().doubleValue())
                     .sum();
 
-            if (recipeTotalWeight <= 0) continue;
+            if (recipeTotalWeight <= 0) {
+                continue;
+            }
             double scale = branchTotalWeight.doubleValue() / recipeTotalWeight;
 
             for (DietDishIngredient ri : recipeIngredients) {
@@ -459,23 +503,25 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
     @Transactional(rollbackFor = Exception.class)
     public void completeMeal(Long mealPlanId, List<DislikeFeedback> dislikes) {
         DietFamilyMealPlan mealPlan = familyMealPlanMapper.selectById(mealPlanId);
-        if (mealPlan == null) return;
+        if (Objects.isNull(mealPlan)) {
+            return;
+        }
 
         Long groupId = mealPlan.getGroupId();
 
         List<DietFamilyMealPlanDish> relations = familyMealPlanDishService.lambdaQuery()
                 .eq(DietFamilyMealPlanDish::getMealPlanId, mealPlanId)
-                .eq(DietFamilyMealPlanDish::getDelFlag, 0)
                 .list();
-        if (relations.isEmpty()) return;
+        if (relations.isEmpty()) {
+            return;
+        }
 
-        List<Long> branchIds = relations.stream().map(DietFamilyMealPlanDish::getBranchId).collect(Collectors.toList());
+        List<Long> branchIds = relations.stream().map(DietFamilyMealPlanDish::getBranchId).toList();
         List<DietDishCookingBranch> branches = dishCookingBranchService.listByIds(branchIds);
-        List<Long> dishIds = branches.stream().map(DietDishCookingBranch::getDishId).distinct().collect(Collectors.toList());
+        List<Long> dishIds = branches.stream().map(DietDishCookingBranch::getDishId).distinct().toList();
 
         List<DietUserHealthProfile> profiles = userHealthProfileService.lambdaQuery()
                 .eq(DietUserHealthProfile::getGroupId, groupId)
-                .eq(DietUserHealthProfile::getDelFlag, 0)
                 .list();
 
         Long cookUserId = getCookUserId(profiles);
@@ -491,7 +537,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
     }
 
     private void updateCookDishStats(Long cookUserId, List<Long> dishIds) {
-        if (cookUserId == null) {
+        if (Objects.isNull(cookUserId)) {
             return;
         }
         for (Long dishId : dishIds) {
@@ -500,7 +546,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
                     .eq(DietCookDishStat::getDishId, dishId)
                     .one();
 
-            if (stat == null) {
+            if (Objects.isNull(stat)) {
                 stat = new DietCookDishStat();
                 stat.setUserId(cookUserId);
                 stat.setDishId(dishId);
@@ -534,7 +580,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
     }
 
     private void recordDislikesFeedback(Long groupId, List<DislikeFeedback> dislikes) {
-        if (dislikes == null || dislikes.isEmpty()) {
+        if (Objects.isNull(dislikes) || dislikes.isEmpty()) {
             return;
         }
         for (DislikeFeedback feedback : dislikes) {
@@ -543,7 +589,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
                     .eq(DietUserDislikeDish::getDishId, feedback.getDishId())
                     .one();
 
-            if (dislike == null) {
+            if (Objects.isNull(dislike)) {
                 dislike = new DietUserDislikeDish();
                 dislike.setProfileId(feedback.getProfileId());
                 dislike.setGroupId(groupId);
@@ -570,8 +616,8 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
     /**
      * 高阶入口：根据 PO 获取联合配餐详情
      */
-    public DietMealDetailVO getMealDetail(com.diet.modules.biz.model.po.DietMealDetailQueryPO po) {
-        if (po == null || po.getGroupId() == null || po.getTargetDate() == null) {
+    public DietMealDetailVO getMealDetail(DietMealDetailQueryPO po) {
+        if (Objects.isNull(po) || Objects.isNull(po.getGroupId()) || Objects.isNull(po.getTargetDate())) {
             return new DietMealDetailVO();
         }
         LocalDate date = LocalDate.parse(po.getTargetDate());
@@ -581,8 +627,8 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
     /**
      * 高阶入口：根据 PO 获取联合配餐全天详情
      */
-    public DietDayMealDetailVO getDayMealDetail(com.diet.modules.biz.model.po.DietMealDetailQueryPO po) {
-        if (po == null || po.getGroupId() == null || po.getTargetDate() == null) {
+    public DietDayMealDetailVO getDayMealDetail(DietMealDetailQueryPO po) {
+        if (Objects.isNull(po) || Objects.isNull(po.getGroupId()) || Objects.isNull(po.getTargetDate())) {
             return new DietDayMealDetailVO();
         }
         LocalDate date = LocalDate.parse(po.getTargetDate());
@@ -599,10 +645,9 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
                 .eq(DietFamilyMealPlan::getGroupId, groupId)
                 .eq(DietFamilyMealPlan::getMealDate, date)
                 .eq(DietFamilyMealPlan::getMealPeriod, mealPeriod)
-                .eq(DietFamilyMealPlan::getDelFlag, 0)
                 .one();
 
-        if (mealPlan == null) {
+        if (Objects.isNull(mealPlan)) {
             vo.setHasMeal(false);
             return vo;
         }
@@ -626,16 +671,15 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
     private List<DietDishCookingBranch> getMealPlanCookingBranches(Long mealPlanId) {
         List<DietFamilyMealPlanDish> dishRels = familyMealPlanDishService.lambdaQuery()
                 .eq(DietFamilyMealPlanDish::getMealPlanId, mealPlanId)
-                .eq(DietFamilyMealPlanDish::getDelFlag, 0)
                 .list();
 
         List<DietDishCookingBranch> dishes = new ArrayList<>();
         if (!dishRels.isEmpty()) {
-            List<Long> branchIds = dishRels.stream().map(DietFamilyMealPlanDish::getBranchId).collect(Collectors.toList());
+            List<Long> branchIds = dishRels.stream().map(DietFamilyMealPlanDish::getBranchId).toList();
             List<DietDishCookingBranch> rawBranches = dishCookingBranchService.listByIds(branchIds);
             for (DietDishCookingBranch b : rawBranches) {
                 DietDish dish = dishService.getById(b.getDishId());
-                if (dish != null) {
+                if (Objects.nonNull(dish)) {
                     b.setBranchName(dish.getDishName() + " (" + b.getBranchName() + ")");
                 }
                 dishes.add(b);
@@ -647,7 +691,6 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
     private List<DietPortionVO> getMealPlanPortions(Long mealPlanId) {
         List<DietFamilyMealPortion> portions = familyMealPortionService.lambdaQuery()
                 .eq(DietFamilyMealPortion::getMealPlanId, mealPlanId)
-                .eq(DietFamilyMealPortion::getDelFlag, 0)
                 .list();
 
         List<DietPortionVO> portionDetails = new ArrayList<>();
@@ -659,7 +702,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
             item.setProfileId(portion.getProfileId());
 
             DietUserHealthProfile profile = userHealthProfileService.getById(portion.getProfileId());
-            if (profile != null) {
+            if (Objects.nonNull(profile)) {
                 item.setMemberName(profile.getMemberName());
                 item.setMemberRelation(profile.getMemberRelation());
             }
@@ -672,7 +715,6 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
     private List<DietGroceryVO> getMealPlanGroceries(Long mealPlanId) {
         List<DietFamilyMealGrocery> groceries = familyMealGroceryService.lambdaQuery()
                 .eq(DietFamilyMealGrocery::getMealPlanId, mealPlanId)
-                .eq(DietFamilyMealGrocery::getDelFlag, 0)
                 .list();
 
         List<DietGroceryVO> groceryDetails = new ArrayList<>();
@@ -682,7 +724,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
             item.setUseAmount(grocery.getUseAmount());
 
             DietIngredient ing = ingredientService.getById(grocery.getIngredientId());
-            if (ing != null) {
+            if (Objects.nonNull(ing)) {
                 item.setIngredientName(ing.getIngredientName());
                 item.setMeasureUnit(ing.getMeasureUnit());
                 item.setIngredientType(ing.getIngredientType());
@@ -702,18 +744,18 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         DietMealDetailVO dinner = getMealDetail(groupId, date, 3);
 
         DietDayMealDetailVO vo = new DietDayMealDetailVO();
-        boolean hasMeal = (breakfast != null && Boolean.TRUE.equals(breakfast.getHasMeal()))
-                || (lunch != null && Boolean.TRUE.equals(lunch.getHasMeal()))
-                || (dinner != null && Boolean.TRUE.equals(dinner.getHasMeal()));
+        boolean hasMeal = (Objects.nonNull(breakfast) && Boolean.TRUE.equals(breakfast.getHasMeal()))
+                || (Objects.nonNull(lunch) && Boolean.TRUE.equals(lunch.getHasMeal()))
+                || (Objects.nonNull(dinner) && Boolean.TRUE.equals(dinner.getHasMeal()));
 
         vo.setHasMeal(hasMeal);
         vo.setBreakfast(breakfast);
         vo.setLunch(lunch);
         vo.setDinner(dinner);
 
-        List<DietGroceryVO> bGroceries = breakfast != null ? breakfast.getGroceries() : null;
-        List<DietGroceryVO> lGroceries = lunch != null ? lunch.getGroceries() : null;
-        List<DietGroceryVO> dGroceries = dinner != null ? dinner.getGroceries() : null;
+        List<DietGroceryVO> bGroceries = Objects.nonNull(breakfast) ? breakfast.getGroceries() : null;
+        List<DietGroceryVO> lGroceries = Objects.nonNull(lunch) ? lunch.getGroceries() : null;
+        List<DietGroceryVO> dGroceries = Objects.nonNull(dinner) ? dinner.getGroceries() : null;
 
         vo.setDailyGroceries(mergeGroceries(bGroceries, lGroceries, dGroceries));
         return vo;
@@ -726,25 +768,25 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
     private final List<DietGroceryVO> mergeGroceries(List<DietGroceryVO>... groceryLists) {
         Map<Long, DietGroceryVO> mergedMap = new LinkedHashMap<>();
         for (List<DietGroceryVO> list : groceryLists) {
-            if (list == null) {
+            if (Objects.isNull(list)) {
                 continue;
             }
             for (DietGroceryVO grocery : list) {
-                if (grocery.getIngredientId() == null) {
+                if (Objects.isNull(grocery.getIngredientId())) {
                     continue;
                 }
                 DietGroceryVO existing = mergedMap.get(grocery.getIngredientId());
-                if (existing == null) {
+                if (Objects.isNull(existing)) {
                     DietGroceryVO copy = new DietGroceryVO();
                     copy.setIngredientId(grocery.getIngredientId());
                     copy.setIngredientName(grocery.getIngredientName());
                     copy.setMeasureUnit(grocery.getMeasureUnit());
                     copy.setIngredientType(grocery.getIngredientType());
                     copy.setIngredientDesc(grocery.getIngredientDesc());
-                    copy.setUseAmount(grocery.getUseAmount() != null ? grocery.getUseAmount() : BigDecimal.ZERO);
+                    copy.setUseAmount(Objects.nonNull(grocery.getUseAmount()) ? grocery.getUseAmount() : BigDecimal.ZERO);
                     mergedMap.put(grocery.getIngredientId(), copy);
                 } else {
-                    BigDecimal amountToAdd = grocery.getUseAmount() != null ? grocery.getUseAmount() : BigDecimal.ZERO;
+                    BigDecimal amountToAdd = Objects.nonNull(grocery.getUseAmount()) ? grocery.getUseAmount() : BigDecimal.ZERO;
                     existing.setUseAmount(existing.getUseAmount().add(amountToAdd));
                 }
             }
@@ -757,7 +799,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
      */
     public Integer getCooldownDays(Long groupId) {
         DietFamilyGroup group = familyGroupService.getById(groupId);
-        return (group != null) ? group.getCooldownDays() : 7;
+        return Objects.nonNull(group) ? group.getCooldownDays() : 7;
     }
 
     /**
@@ -766,7 +808,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
     @Transactional(rollbackFor = Exception.class)
     public Boolean saveCooldownDays(Long groupId, Integer cooldownDays) {
         DietFamilyGroup group = familyGroupService.getById(groupId);
-        if (group != null) {
+        if (Objects.nonNull(group)) {
             group.setCooldownDays(cooldownDays);
             group.setUpdateTime(LocalDateTime.now());
             return familyGroupService.updateById(group);

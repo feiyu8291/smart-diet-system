@@ -1,7 +1,7 @@
 <!-- src/views/system/LoginLog.vue - 登录日志 -->
 <template>
-  <div class="log-container">
-    <el-card class="glass-card" shadow="never">
+  <div class="content-container section-gap">
+    <el-card class="login-log-card">
       <div class="panel-header-section">
         <h3 class="page-title">
           <el-icon class="title-icon">
@@ -53,7 +53,13 @@
       </div>
 
       <!-- 数据表格 -->
-      <el-table v-loading="loading" :data="tableData" class="custom-table" style="width:100%">
+      <el-table
+          v-loading="loading"
+          :data="tableData"
+          border
+          max-height="calc(100vh - 240px)"
+          style="width: 100%; margin-top: 10px"
+      >
         <el-table-column type="index" label="序号" width="70" align="center"/>
         <el-table-column prop="username" label="登录账号" min-width="130"/>
         <el-table-column prop="realName" label="真实姓名" min-width="120"/>
@@ -164,6 +170,14 @@ onMounted(fetchList);
 </script>
 
 <style lang="scss" scoped>
+.login-log-card {
+  .panel-header-section {
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+}
+
 .fail-reason {
   color: #dc2626;
   font-size: 12px;

@@ -7,6 +7,7 @@ import com.diet.modules.common.enums.BucketEnum;
 import com.diet.modules.system.mapper.SysFileStorageMapper;
 import com.diet.modules.system.model.entity.SysFileStorage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,6 +19,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -26,6 +28,7 @@ import java.util.UUID;
  * @author FeiYu
  * @date 2026-06-20
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DietFileStorageService extends ServiceImpl<SysFileStorageMapper, SysFileStorage> {
@@ -34,9 +37,18 @@ public class DietFileStorageService extends ServiceImpl<SysFileStorageMapper, Sy
     private final AmzS3Config amzS3Config;
     private final DietUserDishImageService userDishImageService;
 
+    /**
+     * 上传菜谱自定义封面图，自动触发老文件软删除清理与关联关系覆盖
+     *
+     * @param file    封面图片 MultipartFile 文件流
+     * @param groupId 家庭组ID
+     * @param dishId  菜品ID
+     * @param creator 创建人
+     * @return 最终在 S3/MinIO 上的图片公网访问 URL
+     */
     @Transactional(rollbackFor = Exception.class)
     public String uploadDishImage(MultipartFile file, Long groupId, Long dishId, String creator) {
-        if (file == null || file.isEmpty()) {
+        if (Objects.isNull(file) || file.isEmpty()) {
             throw new RuntimeException("文件内容为空，上传失败");
         }
 
@@ -50,7 +62,7 @@ public class DietFileStorageService extends ServiceImpl<SysFileStorageMapper, Sy
 
         String originalName = file.getOriginalFilename();
         String suffix = "";
-        if (originalName != null && originalName.contains(".")) {
+        if (Objects.nonNull(originalName) && originalName.contains(".")) {
             suffix = originalName.substring(originalName.lastIndexOf("."));
         }
 
@@ -74,7 +86,7 @@ public class DietFileStorageService extends ServiceImpl<SysFileStorageMapper, Sy
         storage.setFileName(originalName);
         storage.setFileRealName(realName);
         storage.setFileSize(String.valueOf(file.getSize()));
-        storage.setFileMimeType(file.getContentType() != null ? file.getContentType() : "image/jpeg");
+        storage.setFileMimeType(Objects.nonNull(file.getContentType()) ? file.getContentType() : "image/jpeg");
         storage.setFileType(suffix.replace(".", ""));
         storage.setFilePath(fileAccessUrl);
         storage.setCreateBy(creator);
@@ -88,13 +100,9 @@ public class DietFileStorageService extends ServiceImpl<SysFileStorageMapper, Sy
                 .eq(DietUserDishImage::getDishId, dishId)
                 .one();
 
-        if (existingImage != null) {
-            SysFileStorage oldStorage = this.baseMapper.selectById(existingImage.getStorageId());
-            if (oldStorage != null) {
-                oldStorage.setDelFlag(1);
-                oldStorage.setUpdateTime(LocalDateTime.now());
-                this.baseMapper.updateById(oldStorage);
-            }
+        if (Objects.nonNull(existingImage)) {
+            // 直接逻辑删除老的文件记录
+            this.removeById(existingImage.getStorageId());
 
             existingImage.setStorageId(storageId);
             existingImage.setUpdateTime(LocalDateTime.now());

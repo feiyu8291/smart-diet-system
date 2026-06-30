@@ -2,6 +2,7 @@ package com.diet.modules.biz.service;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.text.CharSequenceUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -11,11 +12,13 @@ import com.diet.modules.biz.model.po.DietIngredientQueryPO;
 import com.diet.modules.biz.model.vo.DietIngredientVO;
 import com.diet.modules.common.aspect.DictData;
 import com.diet.modules.common.entity.BaseDeleteDTO;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -25,6 +28,7 @@ import java.util.stream.Collectors;
  * @author FeiYu
  * @date 2026-06-22
  */
+@Slf4j
 @Service
 public class DietIngredientService extends ServiceImpl<DietIngredientMapper, DietIngredient> {
 
@@ -34,9 +38,8 @@ public class DietIngredientService extends ServiceImpl<DietIngredientMapper, Die
     @DictData
     public List<DietIngredientVO> listIngredients(String name, Integer ingredientType) {
         List<DietIngredient> list = this.lambdaQuery()
-                .eq(DietIngredient::getDelFlag, 0)
-                .like(name != null && !name.trim().isEmpty(), DietIngredient::getIngredientName, name != null ? name.trim() : null)
-                .eq(ingredientType != null, DietIngredient::getIngredientType, ingredientType)
+                .like(CharSequenceUtil.isNotBlank(name), DietIngredient::getIngredientName, CharSequenceUtil.trim(name))
+                .eq(Objects.nonNull(ingredientType), DietIngredient::getIngredientType, ingredientType)
                 .orderByAsc(DietIngredient::getIngredientId)
                 .list();
         return list.stream().map(entity -> {
@@ -51,14 +54,13 @@ public class DietIngredientService extends ServiceImpl<DietIngredientMapper, Die
      */
     @DictData
     public IPage<DietIngredientVO> pageIngredients(DietIngredientQueryPO po) {
-        if (po == null) {
+        if (Objects.isNull(po)) {
             po = new DietIngredientQueryPO();
         }
         String name = po.getName();
         IPage<DietIngredient> pageResult = this.lambdaQuery()
-                .eq(DietIngredient::getDelFlag, 0)
-                .like(name != null && !name.trim().isEmpty(), DietIngredient::getIngredientName, name != null ? name.trim() : null)
-                .eq(po.getIngredientType() != null, DietIngredient::getIngredientType, po.getIngredientType())
+                .like(CharSequenceUtil.isNotBlank(name), DietIngredient::getIngredientName, CharSequenceUtil.trim(name))
+                .eq(Objects.nonNull(po.getIngredientType()), DietIngredient::getIngredientType, po.getIngredientType())
                 .orderByAsc(DietIngredient::getIngredientId)
                 .page(new Page<>(po.getPageNo(), po.getPageSize()));
         IPage<DietIngredientVO> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
@@ -76,10 +78,10 @@ public class DietIngredientService extends ServiceImpl<DietIngredientMapper, Die
      */
     @Transactional(rollbackFor = Exception.class)
     public boolean saveIngredient(DietIngredient entity) {
-        if (entity == null) {
+        if (Objects.isNull(entity)) {
             return false;
         }
-        if (entity.getIngredientId() != null) {
+        if (Objects.nonNull(entity.getIngredientId())) {
             entity.setUpdateTime(LocalDateTime.now());
         } else {
             entity.setDelFlag(0);
@@ -94,21 +96,14 @@ public class DietIngredientService extends ServiceImpl<DietIngredientMapper, Die
      */
     @Transactional(rollbackFor = Exception.class)
     public boolean deleteIngredients(BaseDeleteDTO dto) {
-        if (dto == null) {
+        if (Objects.isNull(dto)) {
             return false;
         }
         Set<Long> ids = dto.allIds();
         if (CollUtil.isEmpty(ids)) {
             return false;
         }
-        List<DietIngredient> list = ids.stream().map(id -> {
-            DietIngredient entity = new DietIngredient();
-            entity.setIngredientId(id);
-            entity.setDelFlag(1); // 软删除
-            entity.setUpdateTime(LocalDateTime.now());
-            return entity;
-        }).collect(Collectors.toList());
-        return updateBatchById(list);
+        return this.removeBatchByIds(ids);
     }
 }
 

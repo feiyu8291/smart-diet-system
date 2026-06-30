@@ -1,7 +1,7 @@
 <!-- src/views/system/OperationLog.vue - 操作日志 -->
 <template>
-  <div class="log-container">
-    <el-card class="glass-card" shadow="never">
+  <div class="content-container section-gap">
+    <el-card class="op-log-card">
       <div class="panel-header-section">
         <h3 class="page-title">
           <el-icon class="title-icon">
@@ -60,7 +60,13 @@
       </div>
 
       <!-- 数据表格 -->
-      <el-table v-loading="loading" :data="tableData" class="custom-table" style="width:100%">
+      <el-table
+          v-loading="loading"
+          :data="tableData"
+          border
+          max-height="calc(100vh - 240px)"
+          style="width: 100%; margin-top: 10px"
+      >
         <el-table-column type="index" label="序号" width="70" align="center"/>
         <el-table-column prop="realName" label="操作人" min-width="110"/>
         <el-table-column prop="opModule" label="操作模块" min-width="120" align="center">
@@ -103,7 +109,7 @@
 import {onMounted, ref} from 'vue';
 import {ElMessage} from 'element-plus';
 import {Memo, Refresh, Search} from '@element-plus/icons-vue';
-import {getOperationLogPage, getDictMore} from '../../api/system';
+import {getDictMore, getOperationLogPage} from '../../api/system';
 
 interface QueryForm {
   pageNo: number;
@@ -209,5 +215,15 @@ onMounted(() => {
   fetchList();
 });
 </script>
+
+<style lang="scss" scoped>
+.op-log-card {
+  .panel-header-section {
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+}
+</style>
 
 

@@ -2,6 +2,7 @@ package com.diet.modules.biz.service;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.text.CharSequenceUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -10,11 +11,13 @@ import com.diet.modules.biz.model.entity.DietFamilyGroup;
 import com.diet.modules.biz.model.po.DietFamilyGroupQueryPO;
 import com.diet.modules.biz.model.vo.DietFamilyGroupVO;
 import com.diet.modules.common.entity.BaseDeleteDTO;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -24,6 +27,7 @@ import java.util.stream.Collectors;
  * @author FeiYu
  * @date 2026-06-21
  */
+@Slf4j
 @Service
 public class DietFamilyGroupService extends ServiceImpl<DietFamilyGroupMapper, DietFamilyGroup> {
 
@@ -32,8 +36,7 @@ public class DietFamilyGroupService extends ServiceImpl<DietFamilyGroupMapper, D
      */
     public List<DietFamilyGroupVO> listGroups(Long userId) {
         List<DietFamilyGroup> list = this.lambdaQuery()
-                .eq(userId != null, DietFamilyGroup::getCreatorUserId, userId)
-                .eq(DietFamilyGroup::getDelFlag, 0)
+                .eq(Objects.nonNull(userId), DietFamilyGroup::getCreatorUserId, userId)
                 .orderByDesc(DietFamilyGroup::getCreateTime)
                 .list();
         return list.stream().map(entity -> {
@@ -48,13 +51,13 @@ public class DietFamilyGroupService extends ServiceImpl<DietFamilyGroupMapper, D
      */
     @Transactional(rollbackFor = Exception.class)
     public Boolean saveGroup(DietFamilyGroup entity) {
-        if (entity == null) {
+        if (Objects.isNull(entity)) {
             return false;
         }
-        if (entity.getGroupId() == null) {
+        if (Objects.isNull(entity.getGroupId())) {
             entity.setDelFlag(0);
             entity.setCreateTime(LocalDateTime.now());
-            if (entity.getCooldownDays() == null) {
+            if (Objects.isNull(entity.getCooldownDays())) {
                 entity.setCooldownDays(3); // 默认冷却天数为 3 天
             }
         }
@@ -67,37 +70,27 @@ public class DietFamilyGroupService extends ServiceImpl<DietFamilyGroupMapper, D
      */
     @Transactional(rollbackFor = Exception.class)
     public Boolean deleteGroups(BaseDeleteDTO dto) {
-        if (dto == null) {
+        if (Objects.isNull(dto)) {
             return false;
         }
         Set<Long> ids = dto.allIds();
         if (CollUtil.isEmpty(ids)) {
             return false;
         }
-
-        List<DietFamilyGroup> list = ids.stream().map(id -> {
-            DietFamilyGroup entity = new DietFamilyGroup();
-            entity.setGroupId(id);
-            entity.setDelFlag(1); // 软删除
-            entity.setUpdateTime(LocalDateTime.now());
-            return entity;
-        }).collect(Collectors.toList());
-
-        return updateBatchById(list);
+        return this.removeBatchByIds(ids);
     }
 
     /**
      * 分页获取家庭组列表
      */
     public IPage<DietFamilyGroupVO> pageGroups(DietFamilyGroupQueryPO po) {
-        if (po == null) {
+        if (Objects.isNull(po)) {
             po = new DietFamilyGroupQueryPO();
         }
         String groupName = po.getGroupName();
         IPage<DietFamilyGroup> pageResult = this.lambdaQuery()
-                .eq(DietFamilyGroup::getDelFlag, 0)
-                .like(groupName != null && !groupName.trim().isEmpty(), DietFamilyGroup::getGroupName, groupName != null ? groupName.trim() : null)
-                .eq(po.getCreatorUserId() != null, DietFamilyGroup::getCreatorUserId, po.getCreatorUserId())
+                .like(CharSequenceUtil.isNotBlank(groupName), DietFamilyGroup::getGroupName, CharSequenceUtil.trim(groupName))
+                .eq(Objects.nonNull(po.getCreatorUserId()), DietFamilyGroup::getCreatorUserId, po.getCreatorUserId())
                 .orderByDesc(DietFamilyGroup::getCreateTime)
                 .page(new Page<>(po.getPageNo(), po.getPageSize()));
         IPage<DietFamilyGroupVO> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
