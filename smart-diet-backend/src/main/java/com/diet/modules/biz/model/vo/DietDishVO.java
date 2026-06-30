@@ -42,7 +42,7 @@ public class DietDishVO {
     private BigDecimal fat;
     @Schema(description = "碳水化合物 (g)")
     private BigDecimal carbs;
-    @Schema(description = "previewUrl")
+    @Schema(description = "菜品成品图预览地址")
     private String previewUrl;
     private Integer cookCount = 0;
     private Integer signatureFlag = 0;

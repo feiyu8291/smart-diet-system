@@ -1,10 +1,9 @@
 package com.diet.modules.biz.job;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.diet.modules.biz.mapper.DietPlanMapper;
-import com.diet.modules.biz.mapper.DietFamilyPlanProgressMapper;
-import com.diet.modules.biz.model.entity.DietPlan;
 import com.diet.modules.biz.model.entity.DietFamilyPlanProgress;
+import com.diet.modules.biz.model.entity.DietPlan;
+import com.diet.modules.biz.service.DietFamilyPlanProgressService;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
@@ -30,7 +29,7 @@ public class DietFamilyPlanProgressJob extends QuartzJobBean {
     private static final Logger log = LoggerFactory.getLogger(DietFamilyPlanProgressJob.class);
 
     @Autowired
-    private DietFamilyPlanProgressMapper familyPlanProgressMapper;
+    private DietFamilyPlanProgressService familyPlanProgressService;
 
     @Autowired
     private DietPlanMapper dietPlanMapper;
@@ -39,10 +38,10 @@ public class DietFamilyPlanProgressJob extends QuartzJobBean {
     protected void executeInternal(JobExecutionContext context) throws JobExecutionException {
         log.info("开始执行家庭膳食计划天数自动向前推进任务，时间: {}", LocalDateTime.now());
 
-        LambdaQueryWrapper<DietFamilyPlanProgress> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(DietFamilyPlanProgress::getProgressStatus, 1)
-                .eq(DietFamilyPlanProgress::getDelFlag, 0);
-        List<DietFamilyPlanProgress> activeProgressList = familyPlanProgressMapper.selectList(queryWrapper);
+        List<DietFamilyPlanProgress> activeProgressList = familyPlanProgressService.lambdaQuery()
+                .eq(DietFamilyPlanProgress::getProgressStatus, 1)
+                .eq(DietFamilyPlanProgress::getDelFlag, 0)
+                .list();
 
         if (activeProgressList.isEmpty()) {
             log.info("未发现进行中的家庭膳食计划，定时任务结束");
@@ -77,7 +76,7 @@ public class DietFamilyPlanProgressJob extends QuartzJobBean {
 
                 progress.setCurrentDay(currentDay);
                 progress.setUpdateTime(LocalDateTime.now());
-                familyPlanProgressMapper.updateById(progress);
+                familyPlanProgressService.updateById(progress);
 
                 log.info("成功更新家庭组 {} 的膳食计划进度，当前为第 {} 天", progress.getGroupId(), currentDay);
 

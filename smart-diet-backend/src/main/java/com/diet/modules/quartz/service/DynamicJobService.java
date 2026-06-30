@@ -1,7 +1,6 @@
 package com.diet.modules.quartz.service;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.diet.modules.quartz.config.TriggerRunListener;
 import com.diet.modules.quartz.model.entity.SysQuartzJob;
 import lombok.extern.slf4j.Slf4j;
@@ -127,11 +126,10 @@ public class DynamicJobService {
             }
 
             // 获取未停用的有效任务
-            LambdaQueryWrapper<SysQuartzJob> wrapper = new LambdaQueryWrapper<>();
-            wrapper.and(wq -> wq.eq(SysQuartzJob::getPermanentState, 1)
-                    .or().ge(SysQuartzJob::getEndTime, LocalDateTime.now()));
-
-            List<SysQuartzJob> jobEntityList = sysQuartzJobService.list(wrapper);
+            List<SysQuartzJob> jobEntityList = sysQuartzJobService.lambdaQuery()
+                    .and(wq -> wq.eq(SysQuartzJob::getPermanentState, 1)
+                            .or().ge(SysQuartzJob::getEndTime, LocalDateTime.now()))
+                    .list();
 
             // 添加全局监听器记录Misfire等
             scheduler.getListenerManager().addTriggerListener(new TriggerRunListener(sysQuartzJobLogService, this));

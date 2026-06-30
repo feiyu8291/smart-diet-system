@@ -24,7 +24,7 @@ public class DietDishIngredient extends BaseEntity {
     private Long branchId;
     @Schema(description = "原材料ID")
     private Long ingredientId;
-    @Schema(description = "useAmount")
+    @Schema(description = "消耗原料量 (g)")
     private BigDecimal useAmount;
     @Schema(description = "1-核心主料, 0-辅料调味")
     private Integer mainMaterialFlag;

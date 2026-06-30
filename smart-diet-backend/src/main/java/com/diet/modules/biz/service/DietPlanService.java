@@ -1,17 +1,17 @@
 package com.diet.modules.biz.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.diet.modules.biz.mapper.DietPlanMapper;
-import com.diet.modules.biz.mapper.DietFamilyPlanProgressMapper;
-import com.diet.modules.biz.mapper.DietWeightRecordMapper;
 import com.diet.modules.biz.model.dto.DietStartPlanDTO;
 import com.diet.modules.biz.model.dto.DietWeightRecordDTO;
-import com.diet.modules.biz.model.entity.DietPlan;
 import com.diet.modules.biz.model.entity.DietFamilyPlanProgress;
+import com.diet.modules.biz.model.entity.DietPlan;
 import com.diet.modules.biz.model.entity.DietUserHealthProfile;
 import com.diet.modules.biz.model.entity.DietWeightRecord;
 import com.diet.modules.biz.model.vo.DietPlanProgressVO;
+import com.diet.modules.biz.model.vo.DietPlanVO;
+import com.diet.modules.biz.model.vo.DietWeightRecordVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 计划进度与体重分析业务服务类
@@ -30,20 +31,25 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DietPlanService extends ServiceImpl<DietWeightRecordMapper, DietWeightRecord> {
+public class DietPlanService extends ServiceImpl<DietPlanMapper, DietPlan> {
 
     private final DietPlanMapper dietPlanMapper;
-    private final DietFamilyPlanProgressMapper familyPlanProgressMapper;
-    private final DietWeightRecordMapper weightRecordMapper;
+    private final DietFamilyPlanProgressService familyPlanProgressService;
+    private final DietWeightRecordService weightRecordService;
     private final DietUserHealthProfileService userHealthProfileService;
 
     /**
      * 获取全量计划模板列表
      */
-    public List<DietPlan> getTemplates() {
-        LambdaQueryWrapper<DietPlan> query = new LambdaQueryWrapper<>();
-        query.eq(DietPlan::getDelFlag, 0);
-        return dietPlanMapper.selectList(query);
+    public List<DietPlanVO> getTemplates() {
+        List<DietPlan> list = this.lambdaQuery()
+                .eq(DietPlan::getDelFlag, 0)
+                .list();
+        return list.stream().map(entity -> {
+            DietPlanVO vo = new DietPlanVO();
+            BeanUtil.copyProperties(entity, vo);
+            return vo;
+        }).collect(Collectors.toList());
     }
 
     /**
@@ -52,11 +58,11 @@ public class DietPlanService extends ServiceImpl<DietWeightRecordMapper, DietWei
     public DietPlanProgressVO getCurrentProgress(Long groupId) {
         DietPlanProgressVO vo = new DietPlanProgressVO();
 
-        LambdaQueryWrapper<DietFamilyPlanProgress> progressQuery = new LambdaQueryWrapper<>();
-        progressQuery.eq(DietFamilyPlanProgress::getGroupId, groupId)
+        DietFamilyPlanProgress progress = familyPlanProgressService.lambdaQuery()
+                .eq(DietFamilyPlanProgress::getGroupId, groupId)
                 .eq(DietFamilyPlanProgress::getProgressStatus, 1)
-                .eq(DietFamilyPlanProgress::getDelFlag, 0);
-        DietFamilyPlanProgress progress = familyPlanProgressMapper.selectOne(progressQuery);
+                .eq(DietFamilyPlanProgress::getDelFlag, 0)
+                .one();
 
         if (progress != null) {
             vo.setHasActivePlan(true);
@@ -80,14 +86,14 @@ public class DietPlanService extends ServiceImpl<DietWeightRecordMapper, DietWei
         }
 
         // 1. 将现存活跃的计划置为废弃
-        LambdaQueryWrapper<DietFamilyPlanProgress> updateWrapper = new LambdaQueryWrapper<>();
-        updateWrapper.eq(DietFamilyPlanProgress::getGroupId, dto.getGroupId())
-                .eq(DietFamilyPlanProgress::getProgressStatus, 1);
-        DietFamilyPlanProgress active = familyPlanProgressMapper.selectOne(updateWrapper);
+        DietFamilyPlanProgress active = familyPlanProgressService.lambdaQuery()
+                .eq(DietFamilyPlanProgress::getGroupId, dto.getGroupId())
+                .eq(DietFamilyPlanProgress::getProgressStatus, 1)
+                .one();
         if (active != null) {
             active.setProgressStatus(3);
             active.setUpdateTime(LocalDateTime.now());
-            familyPlanProgressMapper.updateById(active);
+            familyPlanProgressService.updateById(active);
         }
 
         // 2. 插入新的一条进度记录
@@ -99,7 +105,7 @@ public class DietPlanService extends ServiceImpl<DietWeightRecordMapper, DietWei
         newProgress.setProgressStatus(1);
         newProgress.setDelFlag(0);
 
-        return familyPlanProgressMapper.insert(newProgress) > 0;
+        return familyPlanProgressService.save(newProgress);
     }
 
     /**
@@ -117,8 +123,8 @@ public class DietPlanService extends ServiceImpl<DietWeightRecordMapper, DietWei
         record.setRecordDate(LocalDate.now());
         record.setDelFlag(0);
 
-        int inserted = weightRecordMapper.insert(record);
-        if (inserted <= 0) return false;
+        boolean inserted = weightRecordService.save(record);
+        if (!inserted) return false;
 
         // 同步修改成员健康档案的当前体重项
         DietUserHealthProfile profile = userHealthProfileService.getById(dto.getProfileId());
@@ -133,11 +139,17 @@ public class DietPlanService extends ServiceImpl<DietWeightRecordMapper, DietWei
     /**
      * 获取成员体重变迁历史记录
      */
-    public List<DietWeightRecord> getWeightHistory(Long profileId) {
-        LambdaQueryWrapper<DietWeightRecord> query = new LambdaQueryWrapper<>();
-        query.eq(DietWeightRecord::getProfileId, profileId)
+    public List<DietWeightRecordVO> getWeightHistory(Long profileId) {
+        List<DietWeightRecord> list = weightRecordService.lambdaQuery()
+                .eq(DietWeightRecord::getProfileId, profileId)
                 .eq(DietWeightRecord::getDelFlag, 0)
-                .orderByAsc(DietWeightRecord::getRecordDate);
-        return weightRecordMapper.selectList(query);
+                .orderByAsc(DietWeightRecord::getRecordDate)
+                .list();
+        return list.stream().map(entity -> {
+            DietWeightRecordVO vo = new DietWeightRecordVO();
+            BeanUtil.copyProperties(entity, vo);
+            return vo;
+        }).collect(Collectors.toList());
     }
 }
+

@@ -1,8 +1,9 @@
 import axios from 'axios'
 import {ElMessage} from 'element-plus'
+import {API_BASE_URL} from '../config'
 
 const request = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
+    baseURL: API_BASE_URL,
     timeout: 10000
 })
 
@@ -33,9 +34,10 @@ request.interceptors.response.use(
                 }
                 return res.data
             } else {
-                // 如果是未认证状态，清除本地 token 强制重新登录
+                // 如果是未认证状态，清除本地 token 并跳转登录页
                 if (res.code === 401) {
                     localStorage.removeItem('token')
+                    window.dispatchEvent(new CustomEvent('unauthorized'))
                 }
                 ElMessage.error(res.message || '操作失败')
                 return Promise.reject(new Error(res.message || '操作失败'))
@@ -46,6 +48,7 @@ request.interceptors.response.use(
     error => {
         if (error.response && error.response.status === 401) {
             localStorage.removeItem('token')
+            window.dispatchEvent(new CustomEvent('unauthorized'))
             ElMessage.error('登录失效，请重新登录')
         } else {
             const msg = error.response?.data?.message || '网络请求错误，请稍后重试'

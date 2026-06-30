@@ -16,7 +16,7 @@ import java.math.BigDecimal;
 public class DietDishIngredientSaveDTO {
     @Schema(description = "原材料ID")
     private Long ingredientId;
-    @Schema(description = "useAmount")
+    @Schema(description = "消耗原料量 (g)")
     private BigDecimal useAmount;
     @Schema(description = "1-主料, 0-辅料/调料")
     private Integer mainMaterialFlag;

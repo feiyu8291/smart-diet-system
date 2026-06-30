@@ -17,7 +17,7 @@ public class DietFamilyMealPlanDish extends BaseEntity {
     @TableId(type = IdType.AUTO)
     @Schema(description = "关联主键ID")
     private Long relationId;
-    @Schema(description = "mealPlanId")
+    @Schema(description = "排餐计划ID")
     private Long mealPlanId;
     @Schema(description = "做法分支ID")
     private Long branchId;

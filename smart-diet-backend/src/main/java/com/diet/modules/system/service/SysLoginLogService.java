@@ -1,7 +1,6 @@
 package com.diet.modules.system.service;
 
 import cn.hutool.core.text.CharSequenceUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.diet.modules.common.entity.BasePageQuery;
@@ -26,20 +25,12 @@ public class SysLoginLogService extends ServiceImpl<SysLoginLogMapper, SysLoginL
      */
     public Page<SysLoginLog> pageLoginLogs(BasePageQuery query, String username, String realName, Integer status) {
         Page<SysLoginLog> page = new Page<>(query.getPageNo(), query.getPageSize());
-        LambdaQueryWrapper<SysLoginLog> wrapper = new LambdaQueryWrapper<>();
-
-        if (CharSequenceUtil.isNotBlank(username)) {
-            wrapper.like(SysLoginLog::getUsername, username);
-        }
-        if (CharSequenceUtil.isNotBlank(realName)) {
-            wrapper.like(SysLoginLog::getRealName, realName);
-        }
-        if (status != null) {
-            wrapper.eq(SysLoginLog::getStatus, status);
-        }
-
-        wrapper.orderByDesc(SysLoginLog::getLoginTime);
-        return this.page(page, wrapper);
+        return this.lambdaQuery()
+                .like(CharSequenceUtil.isNotBlank(username), SysLoginLog::getUsername, username)
+                .like(CharSequenceUtil.isNotBlank(realName), SysLoginLog::getRealName, realName)
+                .eq(status != null, SysLoginLog::getStatus, status)
+                .orderByDesc(SysLoginLog::getLoginTime)
+                .page(page);
     }
 
     /**

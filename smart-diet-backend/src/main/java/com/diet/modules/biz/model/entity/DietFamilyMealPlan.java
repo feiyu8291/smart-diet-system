@@ -16,11 +16,11 @@ import java.time.LocalDate;
 @Schema(description = "家庭配餐计划实体类")
 public class DietFamilyMealPlan extends BaseEntity {
     @TableId(type = IdType.AUTO)
-    @Schema(description = "mealPlanId")
+    @Schema(description = "排餐计划ID")
     private Long mealPlanId;
     @Schema(description = "家庭组ID")
     private Long groupId;
-    @Schema(description = "mealDate")
+    @Schema(description = "就餐日期")
     private LocalDate mealDate;
     @Schema(description = "1-早餐, 2-午餐, 3-晚餐")
     private Integer mealPeriod;

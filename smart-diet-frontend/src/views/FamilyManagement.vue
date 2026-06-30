@@ -395,14 +395,14 @@ const loadSysUsers = async () => {
 const loadGroups = async () => {
   groupsLoading.value = true
   try {
-    let url = `/api/group/page?pageNo=${groupCurrentPage.value}&pageSize=${groupPageSize.value}`
-    if (groupSearchName.value.trim()) {
-      url += `&groupName=${encodeURIComponent(groupSearchName.value.trim())}`
-    }
-    const res: any = await request.get(url)
+    const res: any = await request.post('/api/group/page', {
+      pageNo: groupCurrentPage.value,
+      pageSize: groupPageSize.value,
+      groupName: groupSearchName.value.trim() || null
+    })
     if (res && res.code === 200) {
-      groupsPageData.value = res.data.records || []
-      groupTotal.value = res.data.total || 0
+      groupsPageData.value = res.data || []
+      groupTotal.value = res.page?.total || 0
 
       // 定位高亮行
       if (groupsPageData.value.length > 0) {
@@ -543,7 +543,7 @@ const handleDelete = (profileId: number) => {
       }
   ).then(async () => {
     try {
-      const res = await request.delete(`/api/profile/delete/${profileId}`)
+      const res = await request.post('/api/profile/delete', {id: profileId})
       if (res) {
         ElMessage.success('就餐人移出家庭组成功！')
         loadMembers()
@@ -588,7 +588,7 @@ const handleDeleteGroup = (targetGroupId: number) => {
       }
   ).then(async () => {
     try {
-      const res = await request.delete(`/api/group/delete/${targetGroupId}`)
+      const res = await request.post('/api/group/delete', {id: targetGroupId})
       if (res) {
         ElMessage.success('家庭组已删除！')
         if (activeGroupIdRef.value === targetGroupId) {

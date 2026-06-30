@@ -21,4 +21,9 @@ app.use(ElementPlus, {
     locale: zhCn,
 })
 
+// 监听网络请求层抛出的“登录失效”事件
+window.addEventListener('unauthorized', () => {
+    router.push('/login')
+})
+
 app.mount('#app')

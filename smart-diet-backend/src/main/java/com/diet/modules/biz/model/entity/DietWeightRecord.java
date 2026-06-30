@@ -17,11 +17,11 @@ import java.time.LocalDate;
 @Schema(description = "成员体重记录历史实体类")
 public class DietWeightRecord extends BaseEntity {
     @TableId(type = IdType.AUTO)
-    @Schema(description = "recordId")
+    @Schema(description = "记录ID")
     private Long recordId;
     @Schema(description = "对应 user_health_profile.profile_id")
     private Long profileId;
-    @Schema(description = "recordWeight")
+    @Schema(description = "测定体重 (kg)")
     private BigDecimal recordWeight;
     @Schema(description = "记录日期")
     private LocalDate recordDate;

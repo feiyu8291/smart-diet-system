@@ -2,9 +2,9 @@ package com.diet.modules.biz.controller;
 
 import com.diet.modules.biz.model.dto.DietStartPlanDTO;
 import com.diet.modules.biz.model.dto.DietWeightRecordDTO;
-import com.diet.modules.biz.model.entity.DietPlan;
-import com.diet.modules.biz.model.entity.DietWeightRecord;
 import com.diet.modules.biz.model.vo.DietPlanProgressVO;
+import com.diet.modules.biz.model.vo.DietPlanVO;
+import com.diet.modules.biz.model.vo.DietWeightRecordVO;
 import com.diet.modules.biz.service.DietPlanService;
 import com.diet.modules.common.entity.Result;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,8 +31,8 @@ public class DietPlanController {
 
     @Operation(summary = "获取全量配餐计划模板")
     @GetMapping("/templates")
-    public Result<List<DietPlan>> getTemplates() {
-        List<DietPlan> templates = planService.getTemplates();
+    public Result<List<DietPlanVO>> getTemplates() {
+        List<DietPlanVO> templates = planService.getTemplates();
         return Result.success(templates);
     }
 
@@ -59,8 +59,8 @@ public class DietPlanController {
 
     @Operation(summary = "获取成员体重变动历史")
     @GetMapping("/weight/history")
-    public Result<List<DietWeightRecord>> getWeightHistory(@RequestParam Long profileId) {
-        List<DietWeightRecord> history = planService.getWeightHistory(profileId);
+    public Result<List<DietWeightRecordVO>> getWeightHistory(@RequestParam Long profileId) {
+        List<DietWeightRecordVO> history = planService.getWeightHistory(profileId);
         return Result.success(history);
     }
 }

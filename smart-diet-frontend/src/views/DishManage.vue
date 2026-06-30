@@ -560,6 +560,7 @@ import {computed, onMounted, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {Close, ForkSpoon, Plus} from '@element-plus/icons-vue'
 import request from '../utils/request'
+import {API_BASE_URL} from '../config'
 
 const loading = ref(false)
 const dishes = ref<any[]>([])
@@ -583,7 +584,7 @@ const currentDetailIngredients = ref<any[]>([])
 const currentDetailSteps = ref<any[]>([])
 
 // 基础配置
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+const BASE_URL = API_BASE_URL
 const fileList = ref<any[]>([])
 const allCuisineTypes = ref<any[]>([])
 const allIngredients = ref<any[]>([])
@@ -610,17 +611,13 @@ const form = ref<any>({...defaultForm})
 const loadDishes = async () => {
   loading.value = true
   try {
-    let url = `/api/dish/page?pageNo=${currentPage.value}&pageSize=${pageSize.value}`
-    if (searchName.value && searchName.value.trim()) {
-      url += `&dishName=${encodeURIComponent(searchName.value.trim())}`
-    }
-    if (searchCuisine.value && searchCuisine.value.trim()) {
-      url += `&cuisineType=${encodeURIComponent(searchCuisine.value.trim())}`
-    }
-    if (filterMode.value !== null) {
-      url += `&dietMode=${filterMode.value}`
-    }
-    const res: any = await request.get(url)
+    const res: any = await request.post('/api/dish/page', {
+      pageNo: currentPage.value,
+      pageSize: pageSize.value,
+      dishName: (searchName.value && searchName.value.trim()) ? searchName.value.trim() : null,
+      cuisineType: (searchCuisine.value && searchCuisine.value.trim()) ? searchCuisine.value.trim() : null,
+      dietMode: filterMode.value !== null ? filterMode.value : null
+    })
 
     // page 接口已被拦截器放行返回完整 Result 对象
     if (res && res.code === 200) {
@@ -1081,7 +1078,7 @@ const handleDelete = (branchId: number, displayName: string) => {
       }
   ).then(async () => {
     try {
-      const res = await request.delete(`/api/dish/delete/branch/${branchId}`)
+      const res = await request.post('/api/dish/delete/branch', {id: branchId})
       if (res) {
         ElMessage.success('做法分支删除成功！')
         loadDishes()

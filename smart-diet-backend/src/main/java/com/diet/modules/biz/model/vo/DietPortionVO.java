@@ -18,12 +18,12 @@ public class DietPortionVO {
     private Long portionId;
     @Schema(description = "菜谱ID")
     private Long dishId;
-    @Schema(description = "recommendWeight")
+    @Schema(description = "推荐进食分量 (g)")
     private BigDecimal recommendWeight;
-    @Schema(description = "profileId")
+    @Schema(description = "成员档案ID")
     private Long profileId;
-    @Schema(description = "memberName")
+    @Schema(description = "成员姓名")
     private String memberName;
-    @Schema(description = "memberRelation")
+    @Schema(description = "与做饭人关系")
     private String memberRelation;
 }

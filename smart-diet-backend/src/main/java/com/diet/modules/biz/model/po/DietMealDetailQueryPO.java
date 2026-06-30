@@ -14,8 +14,8 @@ import lombok.Data;
 public class DietMealDetailQueryPO {
     @Schema(description = "家庭组ID")
     private Long groupId;
-    @Schema(description = "targetDate")
+    @Schema(description = "排餐目标就餐日期")
     private String targetDate;
-    @Schema(description = "mealPeriod")
+    @Schema(description = "排餐餐次")
     private Integer mealPeriod;
 }

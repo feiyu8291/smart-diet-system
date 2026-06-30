@@ -15,8 +15,8 @@ import java.util.List;
 @Data
 @Schema(description = "餐次打卡完成传输对象")
 public class DietMealCompleteDTO {
-    @Schema(description = "mealPlanId")
+    @Schema(description = "排餐计划ID")
     private Long mealPlanId;
-    @Schema(description = "dislikes")
+    @Schema(description = "就餐中触发的食材忌口反馈列表")
     private List<DietFamilyMealPlanService.DislikeFeedback> dislikes;
 }

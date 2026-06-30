@@ -5,6 +5,7 @@ import com.diet.modules.biz.model.dto.DietUserHealthProfileDTO;
 import com.diet.modules.biz.model.po.DietUserHealthProfileQueryPO;
 import com.diet.modules.biz.model.vo.DietUserHealthProfileVO;
 import com.diet.modules.biz.service.DietUserHealthProfileService;
+import com.diet.modules.common.entity.BaseDeleteDTO;
 import com.diet.modules.common.entity.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,18 +29,18 @@ public class DietUserHealthProfileController {
 
     private final DietUserHealthProfileService userHealthProfileService;
 
+    @Operation(summary = "查询家庭成员健康档案分页列表")
+    @PostMapping("/page")
+    public Result<List<DietUserHealthProfileVO>> page(@RequestBody DietUserHealthProfileQueryPO po) {
+        IPage<DietUserHealthProfileVO> page = userHealthProfileService.pageProfiles(po);
+        return Result.successPage(page);
+    }
+
     @Operation(summary = "查询家庭成员健康档案列表")
     @GetMapping("/list")
     public Result<List<DietUserHealthProfileVO>> list(@RequestParam(required = false) Long groupId) {
         List<DietUserHealthProfileVO> list = userHealthProfileService.listProfiles(groupId);
         return Result.success(list);
-    }
-
-    @Operation(summary = "查询家庭成员健康档案分页列表")
-    @GetMapping("/page")
-    public Result<List<DietUserHealthProfileVO>> page(DietUserHealthProfileQueryPO po) {
-        IPage<DietUserHealthProfileVO> page = userHealthProfileService.pageProfiles(po);
-        return Result.successPage(page);
     }
 
     @Operation(summary = "保存/修改成员档案")
@@ -50,9 +51,10 @@ public class DietUserHealthProfileController {
     }
 
     @Operation(summary = "软删除成员档案")
-    @DeleteMapping("/delete/{profileId}")
-    public Result<Boolean> delete(@PathVariable Long profileId) {
-        Boolean success = userHealthProfileService.deleteProfile(profileId);
+    @PostMapping("/delete")
+    public Result<Boolean> delete(@RequestBody BaseDeleteDTO dto) {
+        Boolean success = userHealthProfileService.deleteProfiles(dto);
         return Result.success(success);
     }
 }
+

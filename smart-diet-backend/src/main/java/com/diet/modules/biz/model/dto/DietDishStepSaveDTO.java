@@ -14,9 +14,9 @@ import lombok.Data;
 public class DietDishStepSaveDTO {
     @Schema(description = "步骤公共池主键ID")
     private Long stepPoolId;
-    @Schema(description = "stepNum")
+    @Schema(description = "操作步骤序号")
     private Integer stepNum;
-    @Schema(description = "customDetail")
+    @Schema(description = "该步骤自定义微调描述")
     private String customDetail;
     @Schema(description = "推荐烹饪秒数")
     private Integer durationSeconds;

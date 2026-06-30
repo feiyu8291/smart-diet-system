@@ -2,10 +2,11 @@ package com.diet.modules.biz.controller;
 
 import com.diet.modules.biz.model.dto.DietMealCompleteDTO;
 import com.diet.modules.biz.model.dto.DietMealPlanSaveDTO;
-import com.diet.modules.biz.model.entity.DietFamilyMealPlan;
 import com.diet.modules.biz.model.po.DietMealDetailQueryPO;
 import com.diet.modules.biz.model.po.DietMealRecommendQueryPO;
 import com.diet.modules.biz.model.vo.DietDayMealDetailVO;
+import com.diet.modules.biz.model.vo.DietDishBranchVO;
+import com.diet.modules.biz.model.vo.DietFamilyMealPlanVO;
 import com.diet.modules.biz.model.vo.DietMealDetailVO;
 import com.diet.modules.biz.service.DietFamilyMealPlanService;
 import com.diet.modules.common.entity.Result;
@@ -14,7 +15,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -48,39 +48,29 @@ public class DietFamilyMealPlanController {
 
     @Operation(summary = "获取联合配餐推荐菜品")
     @GetMapping("/recommend")
-    public Result<List<com.diet.modules.biz.model.entity.DietDishCookingBranch>> getRecommendations(DietMealRecommendQueryPO po) {
-        LocalDate date = LocalDate.parse(po.getTargetDate());
-        List<com.diet.modules.biz.model.entity.DietDishCookingBranch> branches = familyMealPlanService.generateRecommendedMeal(
-                po.getGroupId(), date, po.getMealPeriod(), po.getDietMode(), po.getLimit());
+    public Result<List<DietDishBranchVO>> getRecommendations(DietMealRecommendQueryPO po) {
+        List<DietDishBranchVO> branches = familyMealPlanService.getRecommendations(po);
         return Result.success(branches);
     }
 
     @Operation(summary = "保存联合配餐计划")
     @PostMapping("/save")
-    public Result<DietFamilyMealPlan> saveMealPlan(@RequestBody DietMealPlanSaveDTO dto) {
-        if (dto == null || dto.getGroupId() == null || dto.getTargetDate() == null
-                || dto.getMealPeriod() == null || dto.getDietMode() == null || dto.getBranchIds() == null) {
-            throw new RuntimeException("参数不完整，保存失败");
-        }
-        LocalDate date = LocalDate.parse(dto.getTargetDate());
-        DietFamilyMealPlan mealPlan = familyMealPlanService.saveMealPlan(
-                dto.getGroupId(), date, dto.getMealPeriod(), dto.getDietMode(), dto.getBranchIds());
+    public Result<DietFamilyMealPlanVO> saveMealPlan(@RequestBody DietMealPlanSaveDTO dto) {
+        DietFamilyMealPlanVO mealPlan = familyMealPlanService.saveMealPlan(dto);
         return Result.success(mealPlan);
     }
 
     @Operation(summary = "获取联合配餐详情")
     @GetMapping("/detail")
     public Result<DietMealDetailVO> getMealDetail(DietMealDetailQueryPO po) {
-        LocalDate date = LocalDate.parse(po.getTargetDate());
-        DietMealDetailVO detail = familyMealPlanService.getMealDetail(po.getGroupId(), date, po.getMealPeriod());
+        DietMealDetailVO detail = familyMealPlanService.getMealDetail(po);
         return Result.success(detail);
     }
 
     @Operation(summary = "获取联合配餐全天详情")
     @GetMapping("/day-detail")
     public Result<DietDayMealDetailVO> getDayMealDetail(DietMealDetailQueryPO po) {
-        LocalDate date = LocalDate.parse(po.getTargetDate());
-        DietDayMealDetailVO detail = familyMealPlanService.getDayMealDetail(po.getGroupId(), date);
+        DietDayMealDetailVO detail = familyMealPlanService.getDayMealDetail(po);
         return Result.success(detail);
     }
 

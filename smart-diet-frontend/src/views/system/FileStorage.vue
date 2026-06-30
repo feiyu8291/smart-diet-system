@@ -147,8 +147,9 @@ import {onMounted, ref} from 'vue';
 import {ElMessage, ElMessageBox} from 'element-plus';
 import {Delete, Document, Download, FolderOpened, Loading, Refresh, Search, View} from '@element-plus/icons-vue';
 import {deleteStorageFiles, getFileStoragePage} from '../../api/system';
+import {API_BASE_URL} from '../../config';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const BASE_URL = API_BASE_URL;
 
 const loading = ref(false);
 const tableData = ref<any[]>([]);

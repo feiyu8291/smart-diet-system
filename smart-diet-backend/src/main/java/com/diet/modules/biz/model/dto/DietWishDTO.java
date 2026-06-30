@@ -12,12 +12,12 @@ import lombok.Data;
 @Data
 @Schema(description = "心愿菜保存传输对象")
 public class DietWishDTO {
-    @Schema(description = "profileId")
+    @Schema(description = "就餐成员档案ID")
     private Long profileId;
     @Schema(description = "家庭组ID")
     private Long groupId;
     @Schema(description = "菜谱ID")
     private Long dishId;
-    @Schema(description = "wishDate")
+    @Schema(description = "期望进餐日期")
     private String wishDate;
 }

@@ -15,7 +15,7 @@ import java.util.List;
 @Data
 @Schema(description = "菜谱完整详情视图对象")
 public class DietDishDetailVO {
-    @Schema(description = "dish")
+    @Schema(description = "做法分支对应的菜品详情")
     private DietDish dish;
     @Schema(description = "原材料列表")
     private List<DietDishIngredientVO> ingredients;

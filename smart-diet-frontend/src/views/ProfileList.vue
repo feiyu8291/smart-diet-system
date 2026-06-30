@@ -63,6 +63,7 @@
             <strong class="member-title-text">{{ scope.row.memberName }}</strong>
           </template>
         </el-table-column>
+        <el-table-column prop="groupName" label="归属家庭" min-width="180" align="center"/>
         <el-table-column prop="memberRelation" label="家庭关系" width="95" align="center"/>
         <el-table-column label="性别" width="80" align="center">
           <template #default="scope">
@@ -265,17 +266,140 @@
         <button class="btn-primary" @click="handleSave">保存并自动测评</button>
       </template>
     </el-dialog>
+
+    <!-- 健康报告侧边抽屉（纯展示） -->
+    <el-drawer
+        v-model="drawerVisible"
+        :title="drawerProfile ? `${drawerProfile.memberName} 的健康评估报告` : '健康评估报告'"
+        size="550px"
+        destroy-on-close
+    >
+      <div class="report-drawer-content" v-if="drawerProfile">
+        <!-- 核心体测评估大盘 -->
+        <div class="profile-dashboard-card color-block color-block-lilac" style="padding: 20px; border-radius: var(--rounded-md); margin-bottom: 20px;">
+          <div class="card-header-row" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+            <div>
+              <span class="eyebrow">HEALTH REPORT</span>
+              <h2 class="card-title" style="margin: 4px 0 0 0; font-size: 18px; font-weight: 700;">{{ drawerProfile.memberName }} 的健康数据</h2>
+            </div>
+            <span class="tag-relation" style="font-size: 11px; padding: 2px 8px; border: 1px solid var(--hairline); border-radius: var(--rounded-xs); background: var(--surface-2); font-weight: 600;">
+              {{ drawerProfile.groupName || '未归属' }} | {{ drawerProfile.memberRelation }}
+            </span>
+          </div>
+
+          <!-- 四大核心指标 -->
+          <div class="profile-metrics-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+            <div class="metric-card-item" style="background: var(--surface-2); border: 1px solid var(--hairline); padding: 12px; border-radius: var(--rounded-md);">
+              <span class="caption" style="font-size: 11px; color: var(--ink-subtle);">BMI 体质指数</span>
+              <div class="metric-value font-mono" style="font-size: 20px; font-weight: 700; margin: 4px 0;">{{ drawerBmiVal }}</div>
+              <span :class="['bmi-status-tag', drawerBmiClass]" style="font-size: 10px; padding: 2px 6px; border-radius: var(--rounded-xs); font-weight: 600;">{{ drawerBmiText }}</span>
+            </div>
+
+            <div class="metric-card-item" style="background: var(--surface-2); border: 1px solid var(--hairline); padding: 12px; border-radius: var(--rounded-md);">
+              <span class="caption" style="font-size: 11px; color: var(--ink-subtle);">BMR 基础代谢</span>
+              <div class="metric-value font-mono" style="font-size: 20px; font-weight: 700; margin: 4px 0;">{{ drawerProfile.bmrCalories || 0 }} <span style="font-size: 11px; font-weight: normal;">kcal</span>
+              </div>
+              <span class="caption-desc" style="font-size: 10px; color: var(--ink-tertiary);">最低维持热量</span>
+            </div>
+
+            <div class="metric-card-item" style="background: var(--surface-2); border: 1px solid var(--hairline); padding: 12px; border-radius: var(--rounded-md);">
+              <span class="caption" style="font-size: 11px; color: var(--ink-subtle);">TDEE 总消耗</span>
+              <div class="metric-value font-mono" style="font-size: 20px; font-weight: 700; margin: 4px 0;">{{ drawerProfile.tdeeCalories || 0 }} <span style="font-size: 11px; font-weight: normal;">kcal</span>
+              </div>
+              <span class="caption-desc" style="font-size: 10px; color: var(--ink-tertiary);">结合活动量实际消耗</span>
+            </div>
+
+            <div class="metric-card-item" style="background: var(--surface-2); border: 1px solid var(--hairline); padding: 12px; border-radius: var(--rounded-md);">
+              <span class="caption" style="font-size: 11px; color: var(--ink-subtle);">日摄入目标</span>
+              <div class="metric-value font-mono" style="font-size: 20px; font-weight: 700; margin: 4px 0; color: var(--primary);">{{ drawerProfile.dailyTargetCalories || 0 }} <span
+                  style="font-size: 11px; font-weight: normal;">kcal</span></div>
+              <span class="caption-desc" style="font-size: 10px; color: var(--ink-tertiary);">根据减重速度计算的预算</span>
+            </div>
+          </div>
+
+          <!-- 身体指标概览列表 -->
+          <div class="physical-params-summary"
+               style="display: flex; justify-content: space-between; background: var(--surface-1); padding: 12px; border-radius: var(--rounded-md); border: 1px solid var(--hairline);">
+            <div class="summary-item" style="display: flex; flex-direction: column; align-items: center; flex: 1;">
+              <span style="font-size: 11px; color: var(--ink-tertiary);">年龄</span>
+              <strong style="font-size: 14px; font-weight: 600;">{{ getAge(drawerProfile.memberBirthday) }} 岁</strong>
+            </div>
+            <div class="summary-item" style="display: flex; flex-direction: column; align-items: center; flex: 1; border-left: 1px dashed var(--hairline);">
+              <span style="font-size: 11px; color: var(--ink-tertiary);">身高</span>
+              <strong style="font-size: 14px; font-weight: 600;">{{ drawerProfile.memberHeight }} cm</strong>
+            </div>
+            <div class="summary-item" style="display: flex; flex-direction: column; align-items: center; flex: 1; border-left: 1px dashed var(--hairline);">
+              <span style="font-size: 11px; color: var(--ink-tertiary);">体重</span>
+              <strong style="font-size: 14px; font-weight: 600;">{{ drawerProfile.memberWeight }} kg</strong>
+            </div>
+            <div class="summary-item" style="display: flex; flex-direction: column; align-items: center; flex: 1; border-left: 1px dashed var(--hairline);">
+              <span style="font-size: 11px; color: var(--ink-tertiary);">目标</span>
+              <strong style="font-size: 14px; font-weight: 600;">{{ drawerProfile.targetWeight }} kg</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- 科学健康减重贴士 -->
+        <div class="science-guide-card color-block color-block-cream" style="padding: 20px; border-radius: var(--rounded-md);">
+          <span class="eyebrow">DIET SCIENCE</span>
+          <h3 class="card-title" style="margin: 4px 0 12px 0; font-size: 16px; font-weight: 700;">💡 科学健康减重贴士</h3>
+          <ul class="guide-list" style="margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--ink-muted); line-height: 1.6;">
+            <li><strong>合理热量赤字：</strong>推荐周减重 0.5kg（对应每日热量赤字约 550 kcal），这是最温和且不易反弹的减脂速度。</li>
+            <li><strong>最低热量防线：</strong>系统已自动开启安全保护机制，您的每日目标摄入量绝不低于 BMR 的 90% 或 1000 kcal，以此避免基础代谢受损。</li>
+          </ul>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import {onMounted, ref} from 'vue'
+import {computed, onMounted, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {Notebook, Plus} from '@element-plus/icons-vue'
-import {useRouter} from 'vue-router'
 import request from '../utils/request'
 
-const router = useRouter()
+const drawerVisible = ref(false)
+const drawerProfile = ref<any>(null)
+
+// 抽屉中的 BMI 核心指标辅助计算
+const drawerBmiVal = computed(() => {
+  if (!drawerProfile.value || !drawerProfile.value.memberWeight || !drawerProfile.value.memberHeight) return '0.0'
+  const heightM = drawerProfile.value.memberHeight / 100.0
+  const bmi = drawerProfile.value.memberWeight / (heightM * heightM)
+  return (Math.round(bmi * 10) / 10).toFixed(1)
+})
+
+const drawerBmiText = computed(() => {
+  const val = parseFloat(drawerBmiVal.value)
+  if (val === 0) return '无数据'
+  if (val < 18.5) return '偏瘦'
+  if (val >= 18.5 && val < 24.0) return '正常'
+  if (val >= 24.0 && val < 28.0) return '超重'
+  return '肥胖'
+})
+
+const drawerBmiClass = computed(() => {
+  const val = parseFloat(drawerBmiVal.value)
+  if (val < 18.5) return 'bmi-under'
+  if (val >= 18.5 && val < 24.0) return 'bmi-normal'
+  if (val >= 24.0 && val < 28.0) return 'bmi-over'
+  return 'bmi-obese'
+})
+
+// 年龄计算
+const getAge = (birthdayStr: string) => {
+  if (!birthdayStr) return 0
+  const birthDate = new Date(birthdayStr)
+  if (isNaN(birthDate.getTime())) return 0
+  const today = new Date()
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const m = today.getMonth() - birthDate.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--
+  }
+  return age >= 0 ? age : 0
+}
 
 const loading = ref(false)
 const profiles = ref<any[]>([])
@@ -353,14 +477,12 @@ const handleIdCardInput = (e: any) => {
 const loadProfiles = async () => {
   loading.value = true
   try {
-    let url = `/api/profile/page?pageNo=${currentPage.value}&pageSize=${pageSize.value}`
-    if (searchName.value.trim()) {
-      url += `&name=${encodeURIComponent(searchName.value.trim())}`
-    }
-    if (filterGroupId.value !== null) {
-      url += `&groupId=${filterGroupId.value}`
-    }
-    const res: any = await request.get(url)
+    const res: any = await request.post('/api/profile/page', {
+      pageNo: currentPage.value,
+      pageSize: pageSize.value,
+      name: searchName.value.trim() || null,
+      groupId: filterGroupId.value !== null ? filterGroupId.value : null
+    })
     if (res && res.code === 200) {
       profiles.value = res.data || []
       totalCount.value = res.page ? res.page.total : profiles.value.length
@@ -402,9 +524,13 @@ const resetSearch = () => {
   loadProfiles()
 }
 
-// 跳转详情大盘
+// 打开健康报告侧边只读抽屉
 const viewReport = (profileId: number) => {
-  router.push({path: '/profile/personal-detail', query: {profileId: profileId}})
+  const found = profiles.value.find(p => p.profileId === profileId)
+  if (found) {
+    drawerProfile.value = found
+    drawerVisible.value = true
+  }
 }
 
 // 新建弹窗
@@ -466,7 +592,7 @@ const handleDelete = (profileId: number) => {
       }
   ).then(async () => {
     try {
-      const res = await request.delete(`/api/profile/delete/${profileId}`)
+      const res = await request.post('/api/profile/delete', {id: profileId})
       if (res) {
         ElMessage.success('删除健康档案成功！')
         loadProfiles()
@@ -591,5 +717,126 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* 侧边健康报告抽屉修饰样式 */
+.report-drawer-content {
+  padding: 10px 0;
+}
+
+.profile-dashboard-card {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+/* 核心四大指标 */
+.profile-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
+
+.metric-card-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 90px;
+}
+
+.metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.metric-value .unit {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-subtle);
+}
+
+.caption-desc {
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  line-height: 1.3;
+}
+
+/* BMI 标签颜色分类 */
+.bmi-status-tag {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: var(--rounded-xs);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.bmi-under {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+.bmi-normal {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+
+.bmi-over {
+  background-color: #fef3c7;
+  color: #b45309;
+}
+
+.bmi-obese {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+/* 身体概览排列表 */
+.physical-params-summary {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.summary-item .label {
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  margin-bottom: 2px;
+}
+
+.summary-item strong {
+  color: var(--ink);
+}
+
+/* 科学指南列表 */
+.science-guide-card .guide-list {
+  margin-top: var(--spacing-sm);
+  padding-left: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  color: var(--ink-muted);
+}
+
+.science-guide-card .guide-list li {
+  line-height: 1.6;
 }
 </style>

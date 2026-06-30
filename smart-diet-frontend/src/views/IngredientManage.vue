@@ -57,7 +57,7 @@
           style="width: 100%; margin-top: 10px"
       >
         <el-table-column prop="ingredientId" label="ID" width="80" align="center"/>
-        <el-table-column prop="ingredientName" label="原材料名称" min-width="150"/>
+        <el-table-column prop="ingredientName" label="原材料名称" width="180" align="center"/>
         <el-table-column prop="ingredientType" label="类型" width="105" align="center">
           <template #default="scope">
             <span v-if="scope.row.ingredientType === 1" class="type-badge type-meat">{{ scope.row.ingredientTypeLabel }}</span>
@@ -74,7 +74,7 @@
             <span class="font-mono">{{ scope.row.calories || 0 }}</span> <span class="unit">kcal</span>
           </template>
         </el-table-column>
-        <el-table-column label="蛋白质 (100g)" width="110" align="right">
+        <el-table-column label="蛋白质 (100g)" width="120" align="right">
           <template #default="scope">
             <span class="font-mono">{{ scope.row.protein || 0 }}</span> <span class="unit">g</span>
           </template>
@@ -231,14 +231,12 @@ const form = ref({...defaultForm})
 const loadIngredients = async () => {
   loading.value = true
   try {
-    let url = `/api/ingredient/page?pageNo=${currentPage.value}&pageSize=${pageSize.value}`
-    if (searchName.value.trim()) {
-      url += `&name=${encodeURIComponent(searchName.value.trim())}`
-    }
-    if (filterType.value !== null && filterType.value !== undefined && String(filterType.value) !== 'undefined') {
-      url += `&ingredientType=${filterType.value}`
-    }
-    const res: any = await request.get(url)
+    const res: any = await request.post('/api/ingredient/page', {
+      pageNo: currentPage.value,
+      pageSize: pageSize.value,
+      name: searchName.value.trim() || null,
+      ingredientType: (filterType.value !== null && filterType.value !== undefined && String(filterType.value) !== 'undefined') ? filterType.value : null
+    })
     if (res && res.code === 200) {
       ingredients.value = res.data || []
       totalCount.value = res.page ? res.page.total : ingredients.value.length
@@ -325,7 +323,7 @@ const handleDelete = (ingredientId: number) => {
       }
   ).then(async () => {
     try {
-      const res = await request.delete(`/api/ingredient/delete/${ingredientId}`)
+      const res = await request.post('/api/ingredient/delete', {id: ingredientId})
       if (res) {
         ElMessage.success('删除成功！')
         loadIngredients()

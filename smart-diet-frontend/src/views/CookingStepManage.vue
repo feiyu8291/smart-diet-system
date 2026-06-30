@@ -135,11 +135,11 @@ const form = ref({...defaultForm})
 const loadSteps = async () => {
   loading.value = true
   try {
-    let url = `/api/step/page?pageNo=${currentPage.value}&pageSize=${pageSize.value}`
-    if (searchQuery.value.trim()) {
-      url += `&name=${encodeURIComponent(searchQuery.value.trim())}`
-    }
-    const res: any = await request.get(url)
+    const res: any = await request.post('/api/step/page', {
+      pageNo: currentPage.value,
+      pageSize: pageSize.value,
+      name: searchQuery.value.trim() || null
+    })
     if (res && res.code === 200) {
       steps.value = res.data || []
       totalCount.value = res.page ? res.page.total : steps.value.length
@@ -207,7 +207,7 @@ const handleDelete = (stepPoolId: number) => {
       }
   ).then(async () => {
     try {
-      const res = await request.delete(`/api/step/delete/${stepPoolId}`)
+      const res = await request.post('/api/step/delete', {id: stepPoolId})
       if (res) {
         ElMessage.success('删除成功！')
         loadSteps()

@@ -16,11 +16,11 @@ import java.math.BigDecimal;
 public class DietGroceryVO {
     @Schema(description = "原材料ID")
     private Long ingredientId;
-    @Schema(description = "useAmount")
+    @Schema(description = "累计使用原料克数")
     private BigDecimal useAmount;
     @Schema(description = "原材料名称")
     private String ingredientName;
-    @Schema(description = "measureUnit")
+    @Schema(description = "原料计量单位")
     private String measureUnit;
     @Schema(description = "食材类型(1-荤菜类, 2-素菜类, 3-调辅配料, 4-基础调味)")
     private Integer ingredientType;

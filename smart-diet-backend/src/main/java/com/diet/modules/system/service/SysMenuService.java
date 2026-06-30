@@ -3,7 +3,6 @@ package com.diet.modules.system.service;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.text.CharSequenceUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.diet.modules.common.exception.BusinessException;
 import com.diet.modules.system.mapper.SysMenuMapper;
@@ -29,9 +28,10 @@ public class SysMenuService extends ServiceImpl<SysMenuMapper, SysMenu> {
      * 查询所有菜单并构建树形结构
      */
     public List<SysMenuVO> getAllTree() {
-        List<SysMenu> all = list(new LambdaQueryWrapper<SysMenu>()
+        List<SysMenu> all = lambdaQuery()
                 .orderByAsc(SysMenu::getSortOrder)
-                .orderByAsc(SysMenu::getMenuId));
+                .orderByAsc(SysMenu::getMenuId)
+                .list();
         return buildTree(all, null);
     }
 

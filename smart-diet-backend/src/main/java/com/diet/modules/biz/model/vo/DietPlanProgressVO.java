@@ -14,10 +14,10 @@ import lombok.Data;
 @Data
 @Schema(description = "配餐计划进度跟踪视图对象")
 public class DietPlanProgressVO {
-    @Schema(description = "hasActivePlan")
+    @Schema(description = "当前是否有执行中的膳食计划")
     private Boolean hasActivePlan;
-    @Schema(description = "progress")
+    @Schema(description = "计划执行进度百分比 (0-100)")
     private DietFamilyPlanProgress progress;
-    @Schema(description = "template")
+    @Schema(description = "关联的膳食计划模板详情")
     private DietPlan template;
 }

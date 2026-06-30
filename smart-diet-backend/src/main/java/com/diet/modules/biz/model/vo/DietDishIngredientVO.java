@@ -14,14 +14,14 @@ import lombok.Data;
 public class DietDishIngredientVO {
     @Schema(description = "关联主键ID")
     private Long relationId;
-    @Schema(description = "useAmount")
+    @Schema(description = "每100g成品消耗原料量(g)")
     private String useAmount;
-    @Schema(description = "mainMaterialFlag")
+    @Schema(description = "是否为主料 (1-主料, 2-辅料, 3-调料)")
     private Integer mainMaterialFlag;
     @Schema(description = "原材料ID")
     private Long ingredientId;
     @Schema(description = "原材料名称")
     private String ingredientName;
-    @Schema(description = "measureUnit")
+    @Schema(description = "原料计量单位")
     private String measureUnit;
 }

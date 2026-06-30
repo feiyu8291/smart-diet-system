@@ -31,7 +31,7 @@ public class DietIngredient extends BaseEntity {
     private BigDecimal fat;
     @Schema(description = "碳水化合物 (g)")
     private BigDecimal carbs;
-    @Schema(description = "measureUnit")
+    @Schema(description = "计量单位 (如: 克/勺)")
     private String measureUnit;
     @Schema(description = "食材类型(1-荤菜类, 2-素菜类, 3-调辅配料, 4-基础调味)")
     @DictAnnotation(type = DictTypeEnum.INGREDIENT_TYPE, target = "ingredientTypeLabel")

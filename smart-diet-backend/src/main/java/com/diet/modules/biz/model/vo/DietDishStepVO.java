@@ -14,7 +14,7 @@ import lombok.Data;
 @Data
 @Schema(description = "菜谱烹饪步骤详情视图对象")
 public class DietDishStepVO {
-    @Schema(description = "stepNum")
+    @Schema(description = "步骤序号")
     private Integer stepNum;
     @Schema(description = "操作步骤详情")
     private String stepDetail;

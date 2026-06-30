@@ -21,7 +21,7 @@ public class DietPlan extends BaseEntity {
     private String planName;
     @Schema(description = "总天数")
     private Integer totalDays;
-    @Schema(description = "planDescription")
+    @Schema(description = "计划具体阶段指引描述")
     private String planDescription;
 
 }

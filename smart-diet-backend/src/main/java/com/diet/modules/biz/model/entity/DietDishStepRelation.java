@@ -23,9 +23,9 @@ public class DietDishStepRelation extends BaseEntity {
     private Long branchId;
     @Schema(description = "步骤公共池主键ID")
     private Long stepPoolId;
-    @Schema(description = "stepNum")
+    @Schema(description = "步骤序号")
     private Integer stepNum;
-    @Schema(description = "customDetail")
+    @Schema(description = "该做法下的步骤自定义微调操作")
     private String customDetail;
     @Schema(description = "推荐烹饪秒数")
     private Integer durationSeconds;

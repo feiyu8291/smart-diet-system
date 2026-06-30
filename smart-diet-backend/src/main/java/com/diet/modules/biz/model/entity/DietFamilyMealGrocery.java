@@ -18,11 +18,11 @@ public class DietFamilyMealGrocery extends BaseEntity {
     @TableId(type = IdType.AUTO)
     @Schema(description = "采购物品ID")
     private Long groceryId;
-    @Schema(description = "mealPlanId")
+    @Schema(description = "排餐计划ID")
     private Long mealPlanId;
     @Schema(description = "原材料ID")
     private Long ingredientId;
-    @Schema(description = "useAmount")
+    @Schema(description = "所占原材料重量 (g)")
     private BigDecimal useAmount;
 
 }

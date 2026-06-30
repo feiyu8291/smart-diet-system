@@ -17,11 +17,11 @@ public class DietFamilyGroup extends BaseEntity {
     @TableId(type = IdType.AUTO)
     @Schema(description = "家庭组ID")
     private Long groupId;
-    @Schema(description = "groupName")
+    @Schema(description = "家庭组名称")
     private String groupName;
-    @Schema(description = "creatorUserId")
+    @Schema(description = "创建人系统用户ID")
     private Long creatorUserId;
-    @Schema(description = "cooldownDays")
+    @Schema(description = "菜品避重冷静天天数")
     private Integer cooldownDays;
 
 }

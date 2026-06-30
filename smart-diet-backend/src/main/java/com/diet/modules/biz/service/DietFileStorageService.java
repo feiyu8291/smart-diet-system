@@ -1,8 +1,6 @@
 package com.diet.modules.biz.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.diet.modules.biz.mapper.DietUserDishImageMapper;
 import com.diet.modules.biz.model.entity.DietUserDishImage;
 import com.diet.modules.common.config.AmzS3Config;
 import com.diet.modules.common.enums.BucketEnum;
@@ -34,7 +32,7 @@ public class DietFileStorageService extends ServiceImpl<SysFileStorageMapper, Sy
 
     private final S3Client s3Client;
     private final AmzS3Config amzS3Config;
-    private final DietUserDishImageMapper userDishImageMapper;
+    private final DietUserDishImageService userDishImageService;
 
     @Transactional(rollbackFor = Exception.class)
     public String uploadDishImage(MultipartFile file, Long groupId, Long dishId, String creator) {
@@ -85,9 +83,10 @@ public class DietFileStorageService extends ServiceImpl<SysFileStorageMapper, Sy
 
         Long storageId = storage.getStorageId();
 
-        LambdaQueryWrapper<DietUserDishImage> imageWrapper = new LambdaQueryWrapper<>();
-        imageWrapper.eq(DietUserDishImage::getGroupId, groupId).eq(DietUserDishImage::getDishId, dishId);
-        DietUserDishImage existingImage = userDishImageMapper.selectOne(imageWrapper);
+        DietUserDishImage existingImage = userDishImageService.lambdaQuery()
+                .eq(DietUserDishImage::getGroupId, groupId)
+                .eq(DietUserDishImage::getDishId, dishId)
+                .one();
 
         if (existingImage != null) {
             SysFileStorage oldStorage = this.baseMapper.selectById(existingImage.getStorageId());
@@ -100,7 +99,7 @@ public class DietFileStorageService extends ServiceImpl<SysFileStorageMapper, Sy
             existingImage.setStorageId(storageId);
             existingImage.setUpdateTime(LocalDateTime.now());
             existingImage.setUpdateBy(creator);
-            userDishImageMapper.updateById(existingImage);
+            userDishImageService.updateById(existingImage);
         } else {
             DietUserDishImage newImage = new DietUserDishImage();
             newImage.setGroupId(groupId);
@@ -108,9 +107,10 @@ public class DietFileStorageService extends ServiceImpl<SysFileStorageMapper, Sy
             newImage.setStorageId(storageId);
             newImage.setCreateBy(creator);
             newImage.setUpdateBy(creator);
-            userDishImageMapper.insert(newImage);
+            userDishImageService.save(newImage);
         }
 
         return fileAccessUrl;
     }
 }
+

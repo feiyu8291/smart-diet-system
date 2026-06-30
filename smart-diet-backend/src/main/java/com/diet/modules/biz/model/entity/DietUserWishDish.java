@@ -16,7 +16,7 @@ import java.time.LocalDate;
 @Schema(description = "成员心愿菜谱关联实体类")
 public class DietUserWishDish extends BaseEntity {
     @TableId(type = IdType.AUTO)
-    @Schema(description = "wishId")
+    @Schema(description = "心愿单ID")
     private Long wishId;
     @Schema(description = "关联 user_health_profile.profile_id (就餐人档案)")
     private Long profileId;

@@ -38,8 +38,8 @@ amz:
     # 访问的域名：与endPoint一致（若配置了反向代理域名可替换）
     domain: http://localhost:9000
     # 账号的认证信息：对应Compose中配置的MINIO_ROOT_USER/MINIO_ROOT_PASSWORD
-    accessKey: hhxxadmin
-    secretKey: hhxx@2025
+    accessKey: flyadmin
+    secretKey: admin@2025
     # 存储桶（Bucket）：需先在MinIO控制台创建对应的存储桶名称
     defaultBucket: system_base_bucket
     # 文件存储路径

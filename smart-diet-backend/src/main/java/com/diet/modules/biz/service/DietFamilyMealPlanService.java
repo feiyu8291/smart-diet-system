@@ -1,12 +1,12 @@
 package com.diet.modules.biz.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.diet.modules.biz.mapper.*;
+import com.diet.modules.biz.mapper.DietDishIngredientMapper;
+import com.diet.modules.biz.mapper.DietDishStepRelationMapper;
+import com.diet.modules.biz.mapper.DietFamilyMealPlanMapper;
 import com.diet.modules.biz.model.entity.*;
-import com.diet.modules.biz.model.vo.DietDayMealDetailVO;
-import com.diet.modules.biz.model.vo.DietGroceryVO;
-import com.diet.modules.biz.model.vo.DietMealDetailVO;
+import com.diet.modules.biz.model.vo.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,251 +28,290 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMapper, DietFamilyMealPlan> {
 
-    private final DietDishMapper dishMapper;
-    private final DietFamilyGroupMapper familyGroupMapper;
+    // 只注入本模块的主表 Mapper
     private final DietFamilyMealPlanMapper familyMealPlanMapper;
-    private final DietFamilyMealPlanDishMapper familyMealPlanDishMapper;
-    private final DietFamilyMealPortionMapper familyMealPortionMapper;
-    private final DietFamilyMealGroceryMapper familyMealGroceryMapper;
+
+    // 引入其他相关实体的 Service
+    private final DietDishService dishService;
+    private final DietFamilyGroupService familyGroupService;
+    private final DietFamilyMealPlanDishService familyMealPlanDishService;
+    private final DietFamilyMealPortionService familyMealPortionService;
+    private final DietFamilyMealGroceryService familyMealGroceryService;
+    private final DietDishIngredientService dishIngredientService;
+    private final DietCookSkilledDishService cookSkilledDishService;
+    private final DietCookDishStatService cookDishStatService;
+    private final DietUserWishDishService userWishDishService;
+    private final DietUserDislikeDishService userDislikeDishService;
+    private final DietUserHealthProfileService userHealthProfileService;
+    private final DietIngredientService ingredientService;
+    private final DietDishCookingBranchService dishCookingBranchService;
     private final DietDishIngredientMapper dishIngredientMapper;
-    private final DietCookSkilledDishMapper cookSkilledDishMapper;
-    private final DietCookDishStatMapper cookDishStatMapper;
-    private final DietUserWishDishMapper userWishDishMapper;
-    private final DietUserDislikeDishMapper userDislikeDishMapper;
-    private final DietUserHealthProfileMapper userHealthProfileMapper;
-    private final DietIngredientMapper ingredientMapper;
-    private final DietDishCookingBranchMapper dishCookingBranchMapper;
+    private final DietDishStepRelationMapper dishStepRelationMapper;
+
+    /**
+     * 高阶入口：生成家庭联合配餐推荐并转换为 VO
+     */
+    public List<DietDishBranchVO> getRecommendations(com.diet.modules.biz.model.po.DietMealRecommendQueryPO po) {
+        if (po == null || po.getGroupId() == null || po.getTargetDate() == null) {
+            return new ArrayList<>();
+        }
+        LocalDate date = LocalDate.parse(po.getTargetDate());
+        List<DietDishCookingBranch> branches = generateRecommendedMeal(po.getGroupId(), date, po.getMealPeriod(), po.getDietMode(), po.getLimit());
+        return branches.stream().map(b -> {
+            DietDishBranchVO vo = new DietDishBranchVO();
+            BeanUtil.copyProperties(b, vo);
+            return vo;
+        }).collect(Collectors.toList());
+    }
 
     /**
      * 生成家庭联合配餐推荐 (以做法分支为颗粒度)
      */
     public List<DietDishCookingBranch> generateRecommendedMeal(Long groupId, LocalDate targetDate, Integer mealPeriod, Integer dietMode, int limit) {
-        LambdaQueryWrapper<DietDishCookingBranch> branchWrapper = new LambdaQueryWrapper<>();
-        branchWrapper.eq(DietDishCookingBranch::getDietMode, dietMode)
-                .eq(DietDishCookingBranch::getDelFlag, 0);
-        List<DietDishCookingBranch> allBranches = dishCookingBranchMapper.selectList(branchWrapper);
+        List<DietDishCookingBranch> allBranches = dishCookingBranchService.lambdaQuery()
+                .eq(DietDishCookingBranch::getDietMode, dietMode)
+                .eq(DietDishCookingBranch::getDelFlag, 0)
+                .list();
         if (allBranches.isEmpty()) {
             return new ArrayList<>();
         }
 
-        DietFamilyGroup group = familyGroupMapper.selectById(groupId);
+        DietFamilyGroup group = familyGroupService.getById(groupId);
         int cooldownDays = (group != null) ? group.getCooldownDays() : 7;
 
-        LambdaQueryWrapper<DietUserHealthProfile> profileWrapper = new LambdaQueryWrapper<>();
-        profileWrapper.eq(DietUserHealthProfile::getGroupId, groupId)
-                .eq(DietUserHealthProfile::getDelFlag, 0);
-        List<DietUserHealthProfile> profiles = userHealthProfileMapper.selectList(profileWrapper);
+        List<DietUserHealthProfile> profiles = userHealthProfileService.lambdaQuery()
+                .eq(DietUserHealthProfile::getGroupId, groupId)
+                .eq(DietUserHealthProfile::getDelFlag, 0)
+                .list();
 
-        Set<String> cooledCuisines = new HashSet<>();
-        if (cooldownDays > 0) {
-            LocalDate startDate = targetDate.minusDays(cooldownDays);
-            LocalDate endDate = targetDate.minusDays(1);
+        Set<String> cooledCuisines = getCooledCuisines(groupId, targetDate, cooldownDays);
+        Long cookUserId = getCookUserId(profiles);
 
-            LambdaQueryWrapper<DietFamilyMealPlan> pastMealWrapper = new LambdaQueryWrapper<>();
-            pastMealWrapper.eq(DietFamilyMealPlan::getGroupId, groupId)
-                    .between(DietFamilyMealPlan::getMealDate, startDate, endDate)
-                    .eq(DietFamilyMealPlan::getDelFlag, 0);
-            List<DietFamilyMealPlan> pastPlans = familyMealPlanMapper.selectList(pastMealWrapper);
-
-            if (!pastPlans.isEmpty()) {
-                List<Long> planIds = pastPlans.stream().map(DietFamilyMealPlan::getMealPlanId).collect(Collectors.toList());
-                LambdaQueryWrapper<DietFamilyMealPlanDish> pastDishWrapper = new LambdaQueryWrapper<>();
-                pastDishWrapper.in(DietFamilyMealPlanDish::getMealPlanId, planIds)
-                        .eq(DietFamilyMealPlanDish::getDelFlag, 0);
-                List<DietFamilyMealPlanDish> pastRelations = familyMealPlanDishMapper.selectList(pastDishWrapper);
-
-                if (!pastRelations.isEmpty()) {
-                    List<Long> pastBranchIds = pastRelations.stream().map(DietFamilyMealPlanDish::getBranchId).collect(Collectors.toList());
-                    List<DietDishCookingBranch> pastBranches = dishCookingBranchMapper.selectBatchIds(pastBranchIds);
-                    cooledCuisines = pastBranches.stream().map(DietDishCookingBranch::getCuisineType).collect(Collectors.toSet());
-                }
-            }
-        }
-
-        Long cookUserId = null;
-        for (DietUserHealthProfile p : profiles) {
-            if (p.getGroupRole() == 1) {
-                cookUserId = p.getUserId();
-                break;
-            }
-        }
-
-        Set<Long> skilledDishIds = new HashSet<>();
-        Map<Long, DietCookDishStat> statMap = new HashMap<>();
-        Set<String> skilledCuisines = new HashSet<>();
-
-        if (cookUserId != null) {
-            LambdaQueryWrapper<DietCookSkilledDish> skilledWrapper = new LambdaQueryWrapper<>();
-            skilledWrapper.eq(DietCookSkilledDish::getUserId, cookUserId)
-                    .eq(DietCookSkilledDish::getDelFlag, 0);
-            List<DietCookSkilledDish> skilledDishes = cookSkilledDishMapper.selectList(skilledWrapper);
-            skilledDishIds = skilledDishes.stream().map(DietCookSkilledDish::getDishId).collect(Collectors.toSet());
-
-            LambdaQueryWrapper<DietCookDishStat> statWrapper = new LambdaQueryWrapper<>();
-            statWrapper.eq(DietCookDishStat::getUserId, cookUserId)
-                    .eq(DietCookDishStat::getDelFlag, 0);
-            List<DietCookDishStat> stats = cookDishStatMapper.selectList(statWrapper);
-            for (DietCookDishStat stat : stats) {
-                statMap.put(stat.getDishId(), stat);
-            }
-
-            if (!skilledDishIds.isEmpty()) {
-                LambdaQueryWrapper<DietDishCookingBranch> branchCuisineWrapper = new LambdaQueryWrapper<>();
-                branchCuisineWrapper.in(DietDishCookingBranch::getDishId, skilledDishIds).eq(DietDishCookingBranch::getDelFlag, 0);
-                List<DietDishCookingBranch> skilledBranches = dishCookingBranchMapper.selectList(branchCuisineWrapper);
-
-                Map<String, Long> cuisineCounts = skilledBranches.stream()
-                        .collect(Collectors.groupingBy(DietDishCookingBranch::getCuisineType, Collectors.counting()));
-                long totalSkilled = skilledBranches.size();
-                for (Map.Entry<String, Long> entry : cuisineCounts.entrySet()) {
-                    double ratio = (double) entry.getValue() / totalSkilled;
-                    if (ratio >= 0.30 || entry.getValue() >= 2) {
-                        skilledCuisines.add(entry.getKey());
-                    }
-                }
-            }
-        }
+        Set<Long> skilledDishIds = getSkilledDishIds(cookUserId);
+        Map<Long, DietCookDishStat> statMap = getCookDishStatMap(cookUserId);
+        Set<String> skilledCuisines = getSkilledCuisines(cookUserId, skilledDishIds);
 
         List<Long> profileIds = profiles.stream().map(DietUserHealthProfile::getProfileId).collect(Collectors.toList());
-
-        List<DietUserWishDish> wishes = new ArrayList<>();
-        if (!profileIds.isEmpty()) {
-            LambdaQueryWrapper<DietUserWishDish> wishWrapper = new LambdaQueryWrapper<>();
-            wishWrapper.in(DietUserWishDish::getProfileId, profileIds)
-                    .eq(DietUserWishDish::getDelFlag, 0);
-            wishes = userWishDishMapper.selectList(wishWrapper);
-        }
-
-        Map<Long, Integer> dislikeMap = new HashMap<>();
-        if (!profileIds.isEmpty()) {
-            LambdaQueryWrapper<DietUserDislikeDish> dislikeWrapper = new LambdaQueryWrapper<>();
-            dislikeWrapper.in(DietUserDislikeDish::getProfileId, profileIds)
-                    .eq(DietUserDislikeDish::getDelFlag, 0);
-            List<DietUserDislikeDish> dislikes = userDislikeDishMapper.selectList(dislikeWrapper);
-            for (DietUserDislikeDish d : dislikes) {
-                dislikeMap.put(d.getDishId(), d.getDislikeCount());
-            }
-        }
+        List<DietUserWishDish> wishes = getWishes(profileIds);
+        Map<Long, Integer> dislikeMap = getDislikeMap(profileIds);
 
         Map<DietDishCookingBranch, Double> branchWeights = new HashMap<>();
         for (DietDishCookingBranch branch : allBranches) {
-            double w = 1.0;
-            Long dishId = branch.getDishId();
-
-            if (cooledCuisines.contains(branch.getCuisineType())) {
-                w = 0.0;
-            }
-
-            double wishBoost = 1.0;
-            for (DietUserWishDish wish : wishes) {
-                if (wish.getDishId().equals(dishId)) {
-                    if (wish.getWishDate() != null && wish.getWishDate().equals(targetDate)) {
-                        wishBoost = Math.max(wishBoost, 3.0);
-                    } else {
-                        wishBoost = Math.max(wishBoost, 2.0);
-                    }
-                }
-            }
-            w *= wishBoost;
-
-            if (skilledDishIds.contains(dishId)) {
-                w *= 1.4;
-            }
-            if (skilledCuisines.contains(branch.getCuisineType())) {
-                w *= 1.2;
-            }
-            DietCookDishStat stat = statMap.get(dishId);
-            if (stat != null) {
-                if (stat.getSignatureFlag() == 1) {
-                    w *= 1.5;
-                } else if (stat.getCookCount() > 0) {
-                    w *= (1.0 + stat.getCookCount() * 0.05);
-                }
-            }
-
-            Integer dislikeCount = dislikeMap.get(dishId);
-            if (dislikeCount != null) {
-                if (dislikeCount == 1) {
-                    w *= 0.5;
-                } else if (dislikeCount == 2) {
-                    w *= 0.2;
-                } else if (dislikeCount >= 3) {
-                    w = 0.0;
-                }
-            }
-
+            double w = calculateBranchWeight(branch, targetDate, cooledCuisines, wishes, skilledDishIds, skilledCuisines, statMap, dislikeMap);
             if (w > 0.0) {
                 branchWeights.put(branch, w);
             }
         }
 
+        // 补足推荐限制数量
         if (branchWeights.size() < limit) {
-            for (DietDishCookingBranch branch : allBranches) {
-                Long dishId = branch.getDishId();
-                Integer dislikeCount = dislikeMap.get(dishId);
-                if (dislikeCount != null && dislikeCount >= 3) {
-                    continue;
-                }
-                if (!branchWeights.containsKey(branch)) {
-                    double w = 1.0;
-                    double wishBoost = 1.0;
-                    for (DietUserWishDish wish : wishes) {
-                        if (wish.getDishId().equals(dishId)) {
-                            if (wish.getWishDate() != null && wish.getWishDate().equals(targetDate)) {
-                                wishBoost = Math.max(wishBoost, 3.0);
-                            } else {
-                                wishBoost = Math.max(wishBoost, 2.0);
-                            }
-                        }
-                    }
-                    w *= wishBoost;
-                    if (skilledDishIds.contains(dishId)) w *= 1.4;
-                    if (skilledCuisines.contains(branch.getCuisineType())) w *= 1.2;
-                    DietCookDishStat stat = statMap.get(dishId);
-                    if (stat != null) {
-                        if (stat.getSignatureFlag() == 1) w *= 1.5;
-                        else w *= (1.0 + stat.getCookCount() * 0.05);
-                    }
-                    if (dislikeCount != null) {
-                        if (dislikeCount == 1) w *= 0.5;
-                        else if (dislikeCount == 2) w *= 0.2;
-                    }
-                    branchWeights.put(branch, w);
-                }
-            }
+            fillBackupBranches(branchWeights, allBranches, targetDate, wishes, skilledDishIds, skilledCuisines, statMap, dislikeMap);
         }
 
         return com.diet.modules.common.util.WeightedRandomUtil.selectWithoutReplacement(branchWeights, limit);
+    }
+
+    private Set<String> getCooledCuisines(Long groupId, LocalDate targetDate, int cooldownDays) {
+        Set<String> cooledCuisines = new HashSet<>();
+        if (cooldownDays <= 0) {
+            return cooledCuisines;
+        }
+        LocalDate startDate = targetDate.minusDays(cooldownDays);
+        LocalDate endDate = targetDate.minusDays(1);
+
+        List<DietFamilyMealPlan> pastPlans = this.lambdaQuery()
+                .eq(DietFamilyMealPlan::getGroupId, groupId)
+                .between(DietFamilyMealPlan::getMealDate, startDate, endDate)
+                .eq(DietFamilyMealPlan::getDelFlag, 0)
+                .list();
+
+        if (pastPlans.isEmpty()) {
+            return cooledCuisines;
+        }
+
+        List<Long> planIds = pastPlans.stream().map(DietFamilyMealPlan::getMealPlanId).collect(Collectors.toList());
+        List<DietFamilyMealPlanDish> pastRelations = familyMealPlanDishService.lambdaQuery()
+                .in(DietFamilyMealPlanDish::getMealPlanId, planIds)
+                .eq(DietFamilyMealPlanDish::getDelFlag, 0)
+                .list();
+
+        if (!pastRelations.isEmpty()) {
+            List<Long> pastBranchIds = pastRelations.stream().map(DietFamilyMealPlanDish::getBranchId).collect(Collectors.toList());
+            List<DietDishCookingBranch> pastBranches = dishCookingBranchService.listByIds(pastBranchIds);
+            cooledCuisines = pastBranches.stream().map(DietDishCookingBranch::getCuisineType).collect(Collectors.toSet());
+        }
+        return cooledCuisines;
+    }
+
+    private Long getCookUserId(List<DietUserHealthProfile> profiles) {
+        for (DietUserHealthProfile p : profiles) {
+            if (p.getGroupRole() == 1) {
+                return p.getUserId();
+            }
+        }
+        return null;
+    }
+
+    private Set<Long> getSkilledDishIds(Long cookUserId) {
+        if (cookUserId == null) {
+            return new HashSet<>();
+        }
+        List<DietCookSkilledDish> skilledDishes = cookSkilledDishService.lambdaQuery()
+                .eq(DietCookSkilledDish::getUserId, cookUserId)
+                .eq(DietCookSkilledDish::getDelFlag, 0)
+                .list();
+        return skilledDishes.stream().map(DietCookSkilledDish::getDishId).collect(Collectors.toSet());
+    }
+
+    private Map<Long, DietCookDishStat> getCookDishStatMap(Long cookUserId) {
+        Map<Long, DietCookDishStat> statMap = new HashMap<>();
+        if (cookUserId == null) {
+            return statMap;
+        }
+        List<DietCookDishStat> stats = cookDishStatService.lambdaQuery()
+                .eq(DietCookDishStat::getUserId, cookUserId)
+                .eq(DietCookDishStat::getDelFlag, 0)
+                .list();
+        for (DietCookDishStat stat : stats) {
+            statMap.put(stat.getDishId(), stat);
+        }
+        return statMap;
+    }
+
+    private Set<String> getSkilledCuisines(Long cookUserId, Set<Long> skilledDishIds) {
+        Set<String> skilledCuisines = new HashSet<>();
+        if (cookUserId == null || skilledDishIds.isEmpty()) {
+            return skilledCuisines;
+        }
+        List<DietDishCookingBranch> skilledBranches = dishCookingBranchService.lambdaQuery()
+                .in(DietDishCookingBranch::getDishId, skilledDishIds).eq(DietDishCookingBranch::getDelFlag, 0).list();
+
+        Map<String, Long> cuisineCounts = skilledBranches.stream()
+                .collect(Collectors.groupingBy(DietDishCookingBranch::getCuisineType, Collectors.counting()));
+        long totalSkilled = skilledBranches.size();
+        for (Map.Entry<String, Long> entry : cuisineCounts.entrySet()) {
+            double ratio = (double) entry.getValue() / totalSkilled;
+            if (ratio >= 0.30 || entry.getValue() >= 2) {
+                skilledCuisines.add(entry.getKey());
+            }
+        }
+        return skilledCuisines;
+    }
+
+    private List<DietUserWishDish> getWishes(List<Long> profileIds) {
+        if (profileIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return userWishDishService.lambdaQuery()
+                .in(DietUserWishDish::getProfileId, profileIds)
+                .eq(DietUserWishDish::getDelFlag, 0)
+                .list();
+    }
+
+    private Map<Long, Integer> getDislikeMap(List<Long> profileIds) {
+        Map<Long, Integer> dislikeMap = new HashMap<>();
+        if (profileIds.isEmpty()) {
+            return dislikeMap;
+        }
+        List<DietUserDislikeDish> dislikes = userDislikeDishService.lambdaQuery()
+                .in(DietUserDislikeDish::getProfileId, profileIds)
+                .eq(DietUserDislikeDish::getDelFlag, 0)
+                .list();
+        for (DietUserDislikeDish d : dislikes) {
+            dislikeMap.put(d.getDishId(), d.getDislikeCount());
+        }
+        return dislikeMap;
+    }
+
+    private double calculateBranchWeight(DietDishCookingBranch branch, LocalDate targetDate, Set<String> cooledCuisines,
+                                         List<DietUserWishDish> wishes, Set<Long> skilledDishIds, Set<String> skilledCuisines,
+                                         Map<Long, DietCookDishStat> statMap, Map<Long, Integer> dislikeMap) {
+        double w = 1.0;
+        Long dishId = branch.getDishId();
+
+        if (cooledCuisines.contains(branch.getCuisineType())) {
+            w = 0.0;
+        }
+
+        double wishBoost = 1.0;
+        for (DietUserWishDish wish : wishes) {
+            if (wish.getDishId().equals(dishId)) {
+                wishBoost = (wish.getWishDate() != null && wish.getWishDate().equals(targetDate)) ? Math.max(wishBoost, 3.0) : Math.max(wishBoost,
+                        2.0);
+            }
+        }
+        w *= wishBoost;
+
+        if (skilledDishIds.contains(dishId)) {
+            w *= 1.4;
+        }
+        if (skilledCuisines.contains(branch.getCuisineType())) {
+            w *= 1.2;
+        }
+        DietCookDishStat stat = statMap.get(dishId);
+        if (stat != null) {
+            w = (stat.getSignatureFlag() == 1) ? w * 1.5 : w * (1.0 + stat.getCookCount() * 0.05);
+        }
+
+        Integer dislikeCount = dislikeMap.get(dishId);
+        if (dislikeCount != null) {
+            if (dislikeCount == 1) {
+                w *= 0.5;
+            } else if (dislikeCount == 2) {
+                w *= 0.2;
+            } else if (dislikeCount >= 3) {
+                w = 0.0;
+            }
+        }
+        return w;
+    }
+
+    private void fillBackupBranches(Map<DietDishCookingBranch, Double> branchWeights, List<DietDishCookingBranch> allBranches,
+                                    LocalDate targetDate, List<DietUserWishDish> wishes, Set<Long> skilledDishIds,
+                                    Set<String> skilledCuisines, Map<Long, DietCookDishStat> statMap, Map<Long, Integer> dislikeMap) {
+        for (DietDishCookingBranch branch : allBranches) {
+            Long dishId = branch.getDishId();
+            Integer dislikeCount = dislikeMap.get(dishId);
+            if (dislikeCount != null && dislikeCount >= 3) {
+                continue;
+            }
+            if (!branchWeights.containsKey(branch)) {
+                double w = calculateBranchWeight(branch, targetDate, new HashSet<>(), wishes, skilledDishIds, skilledCuisines, statMap, dislikeMap);
+                branchWeights.put(branch, w);
+            }
+        }
+    }
+
+    /**
+     * 高阶入口：确认并保存膳食计划
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public DietFamilyMealPlanVO saveMealPlan(com.diet.modules.biz.model.dto.DietMealPlanSaveDTO dto) {
+        if (dto == null || dto.getGroupId() == null || dto.getTargetDate() == null
+                || dto.getMealPeriod() == null || dto.getDietMode() == null || dto.getBranchIds() == null) {
+            throw new RuntimeException("参数不完整，保存失败");
+        }
+        LocalDate date = LocalDate.parse(dto.getTargetDate());
+        return saveMealPlan(dto.getGroupId(), date, dto.getMealPeriod(), dto.getDietMode(), dto.getBranchIds());
     }
 
     /**
      * 确认并保存膳食计划
      */
     @Transactional(rollbackFor = Exception.class)
-    public DietFamilyMealPlan saveMealPlan(Long groupId, LocalDate targetDate, Integer mealPeriod, Integer dietMode, List<Long> branchIds) {
-        LambdaQueryWrapper<DietFamilyMealPlan> existQuery = new LambdaQueryWrapper<>();
-        existQuery.eq(DietFamilyMealPlan::getGroupId, groupId)
+    public DietFamilyMealPlanVO saveMealPlan(Long groupId, LocalDate targetDate, Integer mealPeriod, Integer dietMode, List<Long> branchIds) {
+        DietFamilyMealPlan mealPlan = this.lambdaQuery()
+                .eq(DietFamilyMealPlan::getGroupId, groupId)
                 .eq(DietFamilyMealPlan::getMealDate, targetDate)
                 .eq(DietFamilyMealPlan::getMealPeriod, mealPeriod)
-                .eq(DietFamilyMealPlan::getDelFlag, 0);
-        DietFamilyMealPlan mealPlan = familyMealPlanMapper.selectOne(existQuery);
+                .eq(DietFamilyMealPlan::getDelFlag, 0)
+                .one();
 
         if (mealPlan != null) {
             mealPlan.setMealDietMode(dietMode);
             mealPlan.setUpdateTime(LocalDateTime.now());
-            familyMealPlanMapper.updateById(mealPlan);
-
-            LambdaQueryWrapper<DietFamilyMealPlanDish> oldDishRel = new LambdaQueryWrapper<>();
-            oldDishRel.eq(DietFamilyMealPlanDish::getMealPlanId, mealPlan.getMealPlanId());
-            familyMealPlanDishMapper.delete(oldDishRel);
-
-            LambdaQueryWrapper<DietFamilyMealPortion> oldPortions = new LambdaQueryWrapper<>();
-            oldPortions.eq(DietFamilyMealPortion::getMealPlanId, mealPlan.getMealPlanId());
-            familyMealPortionMapper.delete(oldPortions);
-
-            LambdaQueryWrapper<DietFamilyMealGrocery> oldGroceries = new LambdaQueryWrapper<>();
-            oldGroceries.eq(DietFamilyMealGrocery::getMealPlanId, mealPlan.getMealPlanId());
-            familyMealGroceryMapper.delete(oldGroceries);
+            this.updateById(mealPlan);
+            cleanOldMealPlanRelations(mealPlan.getMealPlanId());
         } else {
             mealPlan = new DietFamilyMealPlan();
             mealPlan.setGroupId(groupId);
@@ -280,32 +319,60 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
             mealPlan.setMealPeriod(mealPeriod);
             mealPlan.setMealDietMode(dietMode);
             mealPlan.setDelFlag(0);
-            familyMealPlanMapper.insert(mealPlan);
+            this.save(mealPlan);
         }
 
         Long mealPlanId = mealPlan.getMealPlanId();
 
-        for (Long branchId : branchIds) {
+        // 插入配餐做法分支关系
+        saveMealPlanDishes(mealPlanId, branchIds);
+
+        // 测算各家庭成员的目标食量并写入 portion
+        List<DietDishCookingBranch> branches = dishCookingBranchService.listByIds(branchIds);
+        calculateMemberPortions(groupId, mealPlanId, mealPeriod, branches);
+
+        // 合并生成买菜超市 grocery 清单
+        generateGroceryList(mealPlanId, branches);
+
+        DietFamilyMealPlanVO vo = new DietFamilyMealPlanVO();
+        BeanUtil.copyProperties(mealPlan, vo);
+        return vo;
+    }
+
+    private void cleanOldMealPlanRelations(Long mealPlanId) {
+        familyMealPlanDishService.lambdaUpdate()
+                .eq(DietFamilyMealPlanDish::getMealPlanId, mealPlanId)
+                .remove();
+
+        familyMealPortionService.lambdaUpdate()
+                .eq(DietFamilyMealPortion::getMealPlanId, mealPlanId)
+                .remove();
+
+        familyMealGroceryService.lambdaUpdate()
+                .eq(DietFamilyMealGrocery::getMealPlanId, mealPlanId)
+                .remove();
+    }
+
+    private void saveMealPlanDishes(Long mealPlanId, List<Long> branchIds) {
+        List<DietFamilyMealPlanDish> rels = branchIds.stream().map(branchId -> {
             DietFamilyMealPlanDish rel = new DietFamilyMealPlanDish();
             rel.setMealPlanId(mealPlanId);
             rel.setBranchId(branchId);
             rel.setDelFlag(0);
-            familyMealPlanDishMapper.insert(rel);
-        }
+            return rel;
+        }).collect(Collectors.toList());
+        familyMealPlanDishService.saveBatch(rels);
+    }
 
-        List<DietDishCookingBranch> branches = dishCookingBranchMapper.selectBatchIds(branchIds);
+    private void calculateMemberPortions(Long groupId, Long mealPlanId, Integer mealPeriod, List<DietDishCookingBranch> branches) {
         int branchCount = branches.size();
-
-        LambdaQueryWrapper<DietUserHealthProfile> profileWrapper = new LambdaQueryWrapper<>();
-        profileWrapper.eq(DietUserHealthProfile::getGroupId, groupId)
-                .eq(DietUserHealthProfile::getDelFlag, 0);
-        List<DietUserHealthProfile> profiles = userHealthProfileMapper.selectList(profileWrapper);
+        List<DietUserHealthProfile> profiles = userHealthProfileService.lambdaQuery()
+                .eq(DietUserHealthProfile::getGroupId, groupId)
+                .eq(DietUserHealthProfile::getDelFlag, 0)
+                .list();
 
         double periodRatio = (mealPeriod == 1 || mealPeriod == 3) ? 0.3 : 0.4;
-        Map<Long, BigDecimal> branchTotalWeights = new HashMap<>();
-        for (DietDishCookingBranch branch : branches) {
-            branchTotalWeights.put(branch.getBranchId(), BigDecimal.ZERO);
-        }
+        List<DietFamilyMealPortion> portionList = new ArrayList<>();
 
         for (DietUserHealthProfile p : profiles) {
             if (p.getDailyTargetCalories() == null) continue;
@@ -324,23 +391,39 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
                 portion.setProfileId(p.getProfileId());
                 portion.setBranchId(branch.getBranchId());
                 portion.setRecommendWeight(weightBD);
-                familyMealPortionMapper.insert(portion);
-
-                BigDecimal currentTotal = branchTotalWeights.get(branch.getBranchId());
-                branchTotalWeights.put(branch.getBranchId(), currentTotal.add(weightBD));
+                portionList.add(portion);
             }
+        }
+        if (!portionList.isEmpty()) {
+            familyMealPortionService.saveBatch(portionList);
+        }
+    }
+
+    private void generateGroceryList(Long mealPlanId, List<DietDishCookingBranch> branches) {
+        // 先汇总当前排餐计划中，每个分支被推荐食用的累计推荐质量 (recommendWeight 之和)
+        Map<Long, BigDecimal> branchTotalWeights = new HashMap<>();
+        for (DietDishCookingBranch branch : branches) {
+            List<DietFamilyMealPortion> portions = familyMealPortionService.lambdaQuery()
+                    .eq(DietFamilyMealPortion::getMealPlanId, mealPlanId)
+                    .eq(DietFamilyMealPortion::getBranchId, branch.getBranchId())
+                    .eq(DietFamilyMealPortion::getDelFlag, 0)
+                    .list();
+            BigDecimal totalWeight = portions.stream()
+                    .map(DietFamilyMealPortion::getRecommendWeight)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            branchTotalWeights.put(branch.getBranchId(), totalWeight);
         }
 
         Map<Long, BigDecimal> ingredientTotalGrams = new HashMap<>();
-
         for (DietDishCookingBranch branch : branches) {
             BigDecimal branchTotalWeight = branchTotalWeights.get(branch.getBranchId());
-            if (branchTotalWeight.compareTo(BigDecimal.ZERO) <= 0) continue;
+            if (branchTotalWeight == null || branchTotalWeight.compareTo(BigDecimal.ZERO) <= 0) continue;
 
-            LambdaQueryWrapper<DietDishIngredient> ingredWrapper = new LambdaQueryWrapper<>();
-            ingredWrapper.eq(DietDishIngredient::getBranchId, branch.getBranchId())
-                    .eq(DietDishIngredient::getDelFlag, 0);
-            List<DietDishIngredient> recipeIngredients = dishIngredientMapper.selectList(ingredWrapper);
+            List<DietDishIngredient> recipeIngredients = dishIngredientService.lambdaQuery()
+                    .eq(DietDishIngredient::getBranchId, branch.getBranchId())
+                    .eq(DietDishIngredient::getDelFlag, 0)
+                    .list();
             if (recipeIngredients.isEmpty()) continue;
 
             double recipeTotalWeight = recipeIngredients.stream()
@@ -348,7 +431,6 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
                     .sum();
 
             if (recipeTotalWeight <= 0) continue;
-
             double scale = branchTotalWeight.doubleValue() / recipeTotalWeight;
 
             for (DietDishIngredient ri : recipeIngredients) {
@@ -358,15 +440,17 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
             }
         }
 
+        List<DietFamilyMealGrocery> groceryList = new ArrayList<>();
         for (Map.Entry<Long, BigDecimal> entry : ingredientTotalGrams.entrySet()) {
             DietFamilyMealGrocery grocery = new DietFamilyMealGrocery();
             grocery.setMealPlanId(mealPlanId);
             grocery.setIngredientId(entry.getKey());
             grocery.setUseAmount(entry.getValue().setScale(2, RoundingMode.HALF_UP));
-            familyMealGroceryMapper.insert(grocery);
+            groceryList.add(grocery);
         }
-
-        return mealPlan;
+        if (!groceryList.isEmpty()) {
+            familyMealGroceryService.saveBatch(groceryList);
+        }
     }
 
     /**
@@ -379,107 +463,144 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
 
         Long groupId = mealPlan.getGroupId();
 
-        LambdaQueryWrapper<DietFamilyMealPlanDish> relWrapper = new LambdaQueryWrapper<>();
-        relWrapper.eq(DietFamilyMealPlanDish::getMealPlanId, mealPlanId)
-                .eq(DietFamilyMealPlanDish::getDelFlag, 0);
-        List<DietFamilyMealPlanDish> relations = familyMealPlanDishMapper.selectList(relWrapper);
+        List<DietFamilyMealPlanDish> relations = familyMealPlanDishService.lambdaQuery()
+                .eq(DietFamilyMealPlanDish::getMealPlanId, mealPlanId)
+                .eq(DietFamilyMealPlanDish::getDelFlag, 0)
+                .list();
         if (relations.isEmpty()) return;
 
         List<Long> branchIds = relations.stream().map(DietFamilyMealPlanDish::getBranchId).collect(Collectors.toList());
-        List<DietDishCookingBranch> branches = dishCookingBranchMapper.selectBatchIds(branchIds);
+        List<DietDishCookingBranch> branches = dishCookingBranchService.listByIds(branchIds);
         List<Long> dishIds = branches.stream().map(DietDishCookingBranch::getDishId).distinct().collect(Collectors.toList());
 
-        LambdaQueryWrapper<DietUserHealthProfile> profileWrapper = new LambdaQueryWrapper<>();
-        profileWrapper.eq(DietUserHealthProfile::getGroupId, groupId)
-                .eq(DietUserHealthProfile::getDelFlag, 0);
-        List<DietUserHealthProfile> profiles = userHealthProfileMapper.selectList(profileWrapper);
+        List<DietUserHealthProfile> profiles = userHealthProfileService.lambdaQuery()
+                .eq(DietUserHealthProfile::getGroupId, groupId)
+                .eq(DietUserHealthProfile::getDelFlag, 0)
+                .list();
 
-        Long cookUserId = null;
-        for (DietUserHealthProfile p : profiles) {
-            if (p.getGroupRole() == 1) {
-                cookUserId = p.getUserId();
-                break;
-            }
+        Long cookUserId = getCookUserId(profiles);
+
+        // 1. 更新做饭人拿手菜统计
+        updateCookDishStats(cookUserId, dishIds);
+
+        // 2. 插入忌口反馈
+        recordDislikesFeedback(groupId, dislikes);
+
+        // 3. 清理已达成的意向
+        clearFulfilledWishes(profiles, dishIds);
+    }
+
+    private void updateCookDishStats(Long cookUserId, List<Long> dishIds) {
+        if (cookUserId == null) {
+            return;
         }
+        for (Long dishId : dishIds) {
+            DietCookDishStat stat = cookDishStatService.lambdaQuery()
+                    .eq(DietCookDishStat::getUserId, cookUserId)
+                    .eq(DietCookDishStat::getDishId, dishId)
+                    .one();
 
-        if (cookUserId != null) {
-            for (Long dishId : dishIds) {
-                LambdaQueryWrapper<DietCookDishStat> statCheck = new LambdaQueryWrapper<>();
-                statCheck.eq(DietCookDishStat::getUserId, cookUserId)
-                        .eq(DietCookDishStat::getDishId, dishId);
-                DietCookDishStat stat = cookDishStatMapper.selectOne(statCheck);
-
-                if (stat == null) {
-                    stat = new DietCookDishStat();
-                    stat.setUserId(cookUserId);
-                    stat.setDishId(dishId);
-                    stat.setCookCount(1);
-                    stat.setSignatureFlag(0);
-                    cookDishStatMapper.insert(stat);
-                } else {
-                    int count = stat.getCookCount() + 1;
-                    stat.setCookCount(count);
-                    if (count >= 5 && stat.getSignatureFlag() == 0) {
-                        stat.setSignatureFlag(1);
-
-                        LambdaQueryWrapper<DietCookSkilledDish> skillCheck = new LambdaQueryWrapper<>();
-                        skillCheck.eq(DietCookSkilledDish::getUserId, cookUserId)
-                                .eq(DietCookSkilledDish::getDishId, dishId);
-                        if (cookSkilledDishMapper.selectCount(skillCheck) == 0) {
-                            DietCookSkilledDish skill = new DietCookSkilledDish();
-                            skill.setUserId(cookUserId);
-                            skill.setDishId(dishId);
-                            cookSkilledDishMapper.insert(skill);
-                        }
-                    }
-                    stat.setUpdateTime(LocalDateTime.now());
-                    cookDishStatMapper.updateById(stat);
+            if (stat == null) {
+                stat = new DietCookDishStat();
+                stat.setUserId(cookUserId);
+                stat.setDishId(dishId);
+                stat.setCookCount(1);
+                stat.setSignatureFlag(0);
+                cookDishStatService.save(stat);
+            } else {
+                int count = stat.getCookCount() + 1;
+                stat.setCookCount(count);
+                if (count >= 5 && stat.getSignatureFlag() == 0) {
+                    stat.setSignatureFlag(1);
+                    checkAndAddSkilledDish(cookUserId, dishId);
                 }
+                stat.setUpdateTime(LocalDateTime.now());
+                cookDishStatService.updateById(stat);
             }
         }
+    }
 
-        if (dislikes != null && !dislikes.isEmpty()) {
-            for (DislikeFeedback feedback : dislikes) {
-                LambdaQueryWrapper<DietUserDislikeDish> dislikeWrapper = new LambdaQueryWrapper<>();
-                dislikeWrapper.eq(DietUserDislikeDish::getProfileId, feedback.getProfileId())
-                        .eq(DietUserDislikeDish::getDishId, feedback.getDishId());
-                DietUserDislikeDish dislike = userDislikeDishMapper.selectOne(dislikeWrapper);
+    private void checkAndAddSkilledDish(Long cookUserId, Long dishId) {
+        boolean skillExists = cookSkilledDishService.lambdaQuery()
+                .eq(DietCookSkilledDish::getUserId, cookUserId)
+                .eq(DietCookSkilledDish::getDishId, dishId)
+                .exists();
+        if (!skillExists) {
+            DietCookSkilledDish skill = new DietCookSkilledDish();
+            skill.setUserId(cookUserId);
+            skill.setDishId(dishId);
+            cookSkilledDishService.save(skill);
+        }
+    }
 
-                if (dislike == null) {
-                    dislike = new DietUserDislikeDish();
-                    dislike.setProfileId(feedback.getProfileId());
-                    dislike.setGroupId(groupId);
-                    dislike.setDishId(feedback.getDishId());
-                    dislike.setDislikeCount(1);
-                    userDislikeDishMapper.insert(dislike);
-                } else {
-                    dislike.setDislikeCount(dislike.getDislikeCount() + 1);
-                    dislike.setUpdateTime(LocalDateTime.now());
-                    userDislikeDishMapper.updateById(dislike);
-                }
+    private void recordDislikesFeedback(Long groupId, List<DislikeFeedback> dislikes) {
+        if (dislikes == null || dislikes.isEmpty()) {
+            return;
+        }
+        for (DislikeFeedback feedback : dislikes) {
+            DietUserDislikeDish dislike = userDislikeDishService.lambdaQuery()
+                    .eq(DietUserDislikeDish::getProfileId, feedback.getProfileId())
+                    .eq(DietUserDislikeDish::getDishId, feedback.getDishId())
+                    .one();
+
+            if (dislike == null) {
+                dislike = new DietUserDislikeDish();
+                dislike.setProfileId(feedback.getProfileId());
+                dislike.setGroupId(groupId);
+                dislike.setDishId(feedback.getDishId());
+                dislike.setDislikeCount(1);
+                userDislikeDishService.save(dislike);
+            } else {
+                dislike.setDislikeCount(dislike.getDislikeCount() + 1);
+                dislike.setUpdateTime(LocalDateTime.now());
+                userDislikeDishService.updateById(dislike);
             }
         }
+    }
 
+    private void clearFulfilledWishes(List<DietUserHealthProfile> profiles, List<Long> dishIds) {
         for (DietUserHealthProfile p : profiles) {
-            LambdaQueryWrapper<DietUserWishDish> wishDel = new LambdaQueryWrapper<>();
-            wishDel.eq(DietUserWishDish::getProfileId, p.getProfileId())
-                    .in(DietUserWishDish::getDishId, dishIds);
-            userWishDishMapper.delete(wishDel);
+            userWishDishService.lambdaUpdate()
+                    .eq(DietUserWishDish::getProfileId, p.getProfileId())
+                    .in(DietUserWishDish::getDishId, dishIds)
+                    .remove();
         }
+    }
+
+    /**
+     * 高阶入口：根据 PO 获取联合配餐详情
+     */
+    public DietMealDetailVO getMealDetail(com.diet.modules.biz.model.po.DietMealDetailQueryPO po) {
+        if (po == null || po.getGroupId() == null || po.getTargetDate() == null) {
+            return new DietMealDetailVO();
+        }
+        LocalDate date = LocalDate.parse(po.getTargetDate());
+        return getMealDetail(po.getGroupId(), date, po.getMealPeriod());
+    }
+
+    /**
+     * 高阶入口：根据 PO 获取联合配餐全天详情
+     */
+    public DietDayMealDetailVO getDayMealDetail(com.diet.modules.biz.model.po.DietMealDetailQueryPO po) {
+        if (po == null || po.getGroupId() == null || po.getTargetDate() == null) {
+            return new DietDayMealDetailVO();
+        }
+        LocalDate date = LocalDate.parse(po.getTargetDate());
+        return getDayMealDetail(po.getGroupId(), date);
     }
 
     /**
      * 查询某次联合配餐的详情信息 (含配给及食材采购清单)
      */
-    public com.diet.modules.biz.model.vo.DietMealDetailVO getMealDetail(Long groupId, LocalDate date, Integer mealPeriod) {
-        com.diet.modules.biz.model.vo.DietMealDetailVO vo = new com.diet.modules.biz.model.vo.DietMealDetailVO();
+    public DietMealDetailVO getMealDetail(Long groupId, LocalDate date, Integer mealPeriod) {
+        DietMealDetailVO vo = new DietMealDetailVO();
 
-        LambdaQueryWrapper<DietFamilyMealPlan> planQuery = new LambdaQueryWrapper<>();
-        planQuery.eq(DietFamilyMealPlan::getGroupId, groupId)
+        DietFamilyMealPlan mealPlan = this.lambdaQuery()
+                .eq(DietFamilyMealPlan::getGroupId, groupId)
                 .eq(DietFamilyMealPlan::getMealDate, date)
                 .eq(DietFamilyMealPlan::getMealPeriod, mealPeriod)
-                .eq(DietFamilyMealPlan::getDelFlag, 0);
-        DietFamilyMealPlan mealPlan = familyMealPlanMapper.selectOne(planQuery);
+                .eq(DietFamilyMealPlan::getDelFlag, 0)
+                .one();
 
         if (mealPlan == null) {
             vo.setHasMeal(false);
@@ -491,41 +612,53 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
         Long mealPlanId = mealPlan.getMealPlanId();
 
         // 1. 获取关联的做法分支列表并装填
-        LambdaQueryWrapper<DietFamilyMealPlanDish> dishRelQuery = new LambdaQueryWrapper<>();
-        dishRelQuery.eq(DietFamilyMealPlanDish::getMealPlanId, mealPlanId)
-                .eq(DietFamilyMealPlanDish::getDelFlag, 0);
-        List<DietFamilyMealPlanDish> dishRels = familyMealPlanDishMapper.selectList(dishRelQuery);
+        vo.setDishes(getMealPlanCookingBranches(mealPlanId));
+
+        // 2. 获取吃饭分配比例
+        vo.setPortions(getMealPlanPortions(mealPlanId));
+
+        // 3. 获取采购清单
+        vo.setGroceries(getMealPlanGroceries(mealPlanId));
+
+        return vo;
+    }
+
+    private List<DietDishCookingBranch> getMealPlanCookingBranches(Long mealPlanId) {
+        List<DietFamilyMealPlanDish> dishRels = familyMealPlanDishService.lambdaQuery()
+                .eq(DietFamilyMealPlanDish::getMealPlanId, mealPlanId)
+                .eq(DietFamilyMealPlanDish::getDelFlag, 0)
+                .list();
 
         List<DietDishCookingBranch> dishes = new ArrayList<>();
         if (!dishRels.isEmpty()) {
             List<Long> branchIds = dishRels.stream().map(DietFamilyMealPlanDish::getBranchId).collect(Collectors.toList());
-            List<DietDishCookingBranch> rawBranches = dishCookingBranchMapper.selectBatchIds(branchIds);
+            List<DietDishCookingBranch> rawBranches = dishCookingBranchService.listByIds(branchIds);
             for (DietDishCookingBranch b : rawBranches) {
-                DietDish dish = dishMapper.selectById(b.getDishId());
+                DietDish dish = dishService.getById(b.getDishId());
                 if (dish != null) {
-                    // 对做法分支的名字进行人性化拼接，如：西兰花炒牛肉 (健身无油版)
                     b.setBranchName(dish.getDishName() + " (" + b.getBranchName() + ")");
                 }
                 dishes.add(b);
             }
         }
-        vo.setDishes(dishes);
+        return dishes;
+    }
 
-        // 2. 获取吃饭分配比例
-        LambdaQueryWrapper<DietFamilyMealPortion> portionQuery = new LambdaQueryWrapper<>();
-        portionQuery.eq(DietFamilyMealPortion::getMealPlanId, mealPlanId)
-                .eq(DietFamilyMealPortion::getDelFlag, 0);
-        List<DietFamilyMealPortion> portions = familyMealPortionMapper.selectList(portionQuery);
+    private List<DietPortionVO> getMealPlanPortions(Long mealPlanId) {
+        List<DietFamilyMealPortion> portions = familyMealPortionService.lambdaQuery()
+                .eq(DietFamilyMealPortion::getMealPlanId, mealPlanId)
+                .eq(DietFamilyMealPortion::getDelFlag, 0)
+                .list();
 
-        List<com.diet.modules.biz.model.vo.DietPortionVO> portionDetails = new ArrayList<>();
+        List<DietPortionVO> portionDetails = new ArrayList<>();
         for (DietFamilyMealPortion portion : portions) {
-            com.diet.modules.biz.model.vo.DietPortionVO item = new com.diet.modules.biz.model.vo.DietPortionVO();
+            DietPortionVO item = new DietPortionVO();
             item.setPortionId(portion.getPortionId());
-            item.setDishId(portion.getBranchId()); // VO 的属性仍名 dishId，在此将做法分支关联赋值
+            item.setDishId(portion.getBranchId()); // 做法分支
             item.setRecommendWeight(portion.getRecommendWeight());
             item.setProfileId(portion.getProfileId());
 
-            DietUserHealthProfile profile = userHealthProfileMapper.selectById(portion.getProfileId());
+            DietUserHealthProfile profile = userHealthProfileService.getById(portion.getProfileId());
             if (profile != null) {
                 item.setMemberName(profile.getMemberName());
                 item.setMemberRelation(profile.getMemberRelation());
@@ -533,21 +666,22 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
 
             portionDetails.add(item);
         }
-        vo.setPortions(portionDetails);
+        return portionDetails;
+    }
 
-        // 3. 获取采购清单
-        LambdaQueryWrapper<DietFamilyMealGrocery> groceryQuery = new LambdaQueryWrapper<>();
-        groceryQuery.eq(DietFamilyMealGrocery::getMealPlanId, mealPlanId)
-                .eq(DietFamilyMealGrocery::getDelFlag, 0);
-        List<DietFamilyMealGrocery> groceries = familyMealGroceryMapper.selectList(groceryQuery);
+    private List<DietGroceryVO> getMealPlanGroceries(Long mealPlanId) {
+        List<DietFamilyMealGrocery> groceries = familyMealGroceryService.lambdaQuery()
+                .eq(DietFamilyMealGrocery::getMealPlanId, mealPlanId)
+                .eq(DietFamilyMealGrocery::getDelFlag, 0)
+                .list();
 
-        List<com.diet.modules.biz.model.vo.DietGroceryVO> groceryDetails = new ArrayList<>();
+        List<DietGroceryVO> groceryDetails = new ArrayList<>();
         for (DietFamilyMealGrocery grocery : groceries) {
-            com.diet.modules.biz.model.vo.DietGroceryVO item = new com.diet.modules.biz.model.vo.DietGroceryVO();
+            DietGroceryVO item = new DietGroceryVO();
             item.setIngredientId(grocery.getIngredientId());
             item.setUseAmount(grocery.getUseAmount());
 
-            DietIngredient ing = ingredientMapper.selectById(grocery.getIngredientId());
+            DietIngredient ing = ingredientService.getById(grocery.getIngredientId());
             if (ing != null) {
                 item.setIngredientName(ing.getIngredientName());
                 item.setMeasureUnit(ing.getMeasureUnit());
@@ -556,9 +690,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
             }
             groceryDetails.add(item);
         }
-        vo.setGroceries(groceryDetails);
-
-        return vo;
+        return groceryDetails;
     }
 
     /**
@@ -624,7 +756,7 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
      * 获取避重冷却天数
      */
     public Integer getCooldownDays(Long groupId) {
-        DietFamilyGroup group = familyGroupMapper.selectById(groupId);
+        DietFamilyGroup group = familyGroupService.getById(groupId);
         return (group != null) ? group.getCooldownDays() : 7;
     }
 
@@ -633,11 +765,11 @@ public class DietFamilyMealPlanService extends ServiceImpl<DietFamilyMealPlanMap
      */
     @Transactional(rollbackFor = Exception.class)
     public Boolean saveCooldownDays(Long groupId, Integer cooldownDays) {
-        DietFamilyGroup group = familyGroupMapper.selectById(groupId);
+        DietFamilyGroup group = familyGroupService.getById(groupId);
         if (group != null) {
             group.setCooldownDays(cooldownDays);
             group.setUpdateTime(LocalDateTime.now());
-            return familyGroupMapper.updateById(group) > 0;
+            return familyGroupService.updateById(group);
         }
         return false;
     }

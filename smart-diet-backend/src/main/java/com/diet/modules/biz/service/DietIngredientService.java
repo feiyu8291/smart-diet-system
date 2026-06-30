@@ -1,14 +1,23 @@
 package com.diet.modules.biz.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.diet.modules.biz.mapper.DietIngredientMapper;
 import com.diet.modules.biz.model.entity.DietIngredient;
+import com.diet.modules.biz.model.po.DietIngredientQueryPO;
+import com.diet.modules.biz.model.vo.DietIngredientVO;
 import com.diet.modules.common.aspect.DictData;
+import com.diet.modules.common.entity.BaseDeleteDTO;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 原材料/食材配料业务服务类
@@ -23,15 +32,84 @@ public class DietIngredientService extends ServiceImpl<DietIngredientMapper, Die
      * 查询原材料列表 (带字典自动翻译)
      */
     @DictData
-    public List<DietIngredient> listIngredients(LambdaQueryWrapper<DietIngredient> query) {
-        return this.list(query);
+    public List<DietIngredientVO> listIngredients(String name, Integer ingredientType) {
+        List<DietIngredient> list = this.lambdaQuery()
+                .eq(DietIngredient::getDelFlag, 0)
+                .like(name != null && !name.trim().isEmpty(), DietIngredient::getIngredientName, name != null ? name.trim() : null)
+                .eq(ingredientType != null, DietIngredient::getIngredientType, ingredientType)
+                .orderByAsc(DietIngredient::getIngredientId)
+                .list();
+        return list.stream().map(entity -> {
+            DietIngredientVO vo = new DietIngredientVO();
+            BeanUtil.copyProperties(entity, vo);
+            return vo;
+        }).collect(Collectors.toList());
     }
 
     /**
      * 原材料分页查询 (带字典自动翻译)
      */
     @DictData
-    public IPage<DietIngredient> pageIngredients(IPage<DietIngredient> page, LambdaQueryWrapper<DietIngredient> query) {
-        return this.page(page, query);
+    public IPage<DietIngredientVO> pageIngredients(DietIngredientQueryPO po) {
+        if (po == null) {
+            po = new DietIngredientQueryPO();
+        }
+        String name = po.getName();
+        IPage<DietIngredient> pageResult = this.lambdaQuery()
+                .eq(DietIngredient::getDelFlag, 0)
+                .like(name != null && !name.trim().isEmpty(), DietIngredient::getIngredientName, name != null ? name.trim() : null)
+                .eq(po.getIngredientType() != null, DietIngredient::getIngredientType, po.getIngredientType())
+                .orderByAsc(DietIngredient::getIngredientId)
+                .page(new Page<>(po.getPageNo(), po.getPageSize()));
+        IPage<DietIngredientVO> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
+        List<DietIngredientVO> voRecords = pageResult.getRecords().stream().map(entity -> {
+            DietIngredientVO vo = new DietIngredientVO();
+            BeanUtil.copyProperties(entity, vo);
+            return vo;
+        }).collect(Collectors.toList());
+        voPage.setRecords(voRecords);
+        return voPage;
+    }
+
+    /**
+     * 保存或更新原材料
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean saveIngredient(DietIngredient entity) {
+        if (entity == null) {
+            return false;
+        }
+        if (entity.getIngredientId() != null) {
+            entity.setUpdateTime(LocalDateTime.now());
+        } else {
+            entity.setDelFlag(0);
+            entity.setCreateTime(LocalDateTime.now());
+            entity.setUpdateTime(LocalDateTime.now());
+        }
+        return saveOrUpdate(entity);
+    }
+
+    /**
+     * 批量或单条软删除原材料
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean deleteIngredients(BaseDeleteDTO dto) {
+        if (dto == null) {
+            return false;
+        }
+        Set<Long> ids = dto.allIds();
+        if (CollUtil.isEmpty(ids)) {
+            return false;
+        }
+        List<DietIngredient> list = ids.stream().map(id -> {
+            DietIngredient entity = new DietIngredient();
+            entity.setIngredientId(id);
+            entity.setDelFlag(1); // 软删除
+            entity.setUpdateTime(LocalDateTime.now());
+            return entity;
+        }).collect(Collectors.toList());
+        return updateBatchById(list);
     }
 }
+
+

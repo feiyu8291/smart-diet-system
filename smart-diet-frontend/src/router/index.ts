@@ -18,12 +18,6 @@ const routes = [
         meta: {title: '健康档案管理 - 智能膳食系统'}
     },
     {
-        path: '/profile/personal-detail',
-        name: 'PersonalProfile',
-        component: () => import('../views/PersonalProfile.vue'),
-        meta: {title: '成员健康评估详情 - 智能膳食系统'}
-    },
-    {
         path: '/profile/family',
         name: 'FamilyProfile',
         component: () => import('../views/FamilyManagement.vue'),

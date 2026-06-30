@@ -1,17 +1,22 @@
 package com.diet.modules.biz.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.diet.modules.biz.mapper.DietFamilyGroupMapper;
 import com.diet.modules.biz.model.entity.DietFamilyGroup;
 import com.diet.modules.biz.model.po.DietFamilyGroupQueryPO;
+import com.diet.modules.biz.model.vo.DietFamilyGroupVO;
+import com.diet.modules.common.entity.BaseDeleteDTO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 家庭分组服务类
@@ -25,14 +30,17 @@ public class DietFamilyGroupService extends ServiceImpl<DietFamilyGroupMapper, D
     /**
      * 根据创建人用户 ID 获取所有有效的家庭分组列表
      */
-    public List<DietFamilyGroup> listGroups(Long userId) {
-        LambdaQueryWrapper<DietFamilyGroup> wrapper = new LambdaQueryWrapper<>();
-        if (userId != null) {
-            wrapper.eq(DietFamilyGroup::getCreatorUserId, userId);
-        }
-        wrapper.eq(DietFamilyGroup::getDelFlag, 0)
-                .orderByDesc(DietFamilyGroup::getCreateTime);
-        return list(wrapper);
+    public List<DietFamilyGroupVO> listGroups(Long userId) {
+        List<DietFamilyGroup> list = this.lambdaQuery()
+                .eq(userId != null, DietFamilyGroup::getCreatorUserId, userId)
+                .eq(DietFamilyGroup::getDelFlag, 0)
+                .orderByDesc(DietFamilyGroup::getCreateTime)
+                .list();
+        return list.stream().map(entity -> {
+            DietFamilyGroupVO vo = new DietFamilyGroupVO();
+            BeanUtil.copyProperties(entity, vo);
+            return vo;
+        }).collect(Collectors.toList());
     }
 
     /**
@@ -55,36 +63,51 @@ public class DietFamilyGroupService extends ServiceImpl<DietFamilyGroupMapper, D
     }
 
     /**
-     * 软删除家庭分组
+     * 批量或单条软删除家庭分组
      */
     @Transactional(rollbackFor = Exception.class)
-    public Boolean deleteGroup(Long groupId) {
-        DietFamilyGroup entity = getById(groupId);
-        if (entity != null) {
-            entity.setDelFlag(1);
-            entity.setUpdateTime(LocalDateTime.now());
-            return updateById(entity);
+    public Boolean deleteGroups(BaseDeleteDTO dto) {
+        if (dto == null) {
+            return false;
         }
-        return false;
+        Set<Long> ids = dto.allIds();
+        if (CollUtil.isEmpty(ids)) {
+            return false;
+        }
+
+        List<DietFamilyGroup> list = ids.stream().map(id -> {
+            DietFamilyGroup entity = new DietFamilyGroup();
+            entity.setGroupId(id);
+            entity.setDelFlag(1); // 软删除
+            entity.setUpdateTime(LocalDateTime.now());
+            return entity;
+        }).collect(Collectors.toList());
+
+        return updateBatchById(list);
     }
 
     /**
      * 分页获取家庭组列表
      */
-    public IPage<DietFamilyGroup> pageGroups(DietFamilyGroupQueryPO po) {
+    public IPage<DietFamilyGroupVO> pageGroups(DietFamilyGroupQueryPO po) {
         if (po == null) {
             po = new DietFamilyGroupQueryPO();
         }
-        Page<DietFamilyGroup> page = new Page<>(po.getPageNo(), po.getPageSize());
-        LambdaQueryWrapper<DietFamilyGroup> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(DietFamilyGroup::getDelFlag, 0);
-        if (po.getGroupName() != null && !po.getGroupName().trim().isEmpty()) {
-            wrapper.like(DietFamilyGroup::getGroupName, po.getGroupName().trim());
-        }
-        if (po.getCreatorUserId() != null) {
-            wrapper.eq(DietFamilyGroup::getCreatorUserId, po.getCreatorUserId());
-        }
-        wrapper.orderByDesc(DietFamilyGroup::getCreateTime);
-        return this.page(page, wrapper);
+        String groupName = po.getGroupName();
+        IPage<DietFamilyGroup> pageResult = this.lambdaQuery()
+                .eq(DietFamilyGroup::getDelFlag, 0)
+                .like(groupName != null && !groupName.trim().isEmpty(), DietFamilyGroup::getGroupName, groupName != null ? groupName.trim() : null)
+                .eq(po.getCreatorUserId() != null, DietFamilyGroup::getCreatorUserId, po.getCreatorUserId())
+                .orderByDesc(DietFamilyGroup::getCreateTime)
+                .page(new Page<>(po.getPageNo(), po.getPageSize()));
+        IPage<DietFamilyGroupVO> voPage = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
+        List<DietFamilyGroupVO> voRecords = pageResult.getRecords().stream().map(entity -> {
+            DietFamilyGroupVO vo = new DietFamilyGroupVO();
+            BeanUtil.copyProperties(entity, vo);
+            return vo;
+        }).collect(Collectors.toList());
+        voPage.setRecords(voRecords);
+        return voPage;
     }
 }
+

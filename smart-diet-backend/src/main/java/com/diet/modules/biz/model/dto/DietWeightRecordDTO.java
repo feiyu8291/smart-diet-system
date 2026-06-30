@@ -14,8 +14,8 @@ import java.math.BigDecimal;
 @Data
 @Schema(description = "体重记录保存传输对象")
 public class DietWeightRecordDTO {
-    @Schema(description = "profileId")
+    @Schema(description = "就餐成员档案ID")
     private Long profileId;
-    @Schema(description = "recordWeight")
+    @Schema(description = "测定体重 (kg)")
     private BigDecimal recordWeight;
 }

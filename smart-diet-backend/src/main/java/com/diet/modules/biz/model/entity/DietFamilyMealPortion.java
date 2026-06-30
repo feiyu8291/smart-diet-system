@@ -18,13 +18,13 @@ public class DietFamilyMealPortion extends BaseEntity {
     @TableId(type = IdType.AUTO)
     @Schema(description = "份量比例ID")
     private Long portionId;
-    @Schema(description = "mealPlanId")
+    @Schema(description = "排餐计划ID")
     private Long mealPlanId;
     @Schema(description = "关联 user_health_profile.profile_id (就餐人档案)")
     private Long profileId;
     @Schema(description = "做法分支ID")
     private Long branchId;
-    @Schema(description = "recommendWeight")
+    @Schema(description = "计算得出的建议分量 (g)")
     private BigDecimal recommendWeight;
 
 }

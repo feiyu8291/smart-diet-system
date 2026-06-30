@@ -9,6 +9,7 @@ import com.diet.modules.biz.model.po.DietDishQueryPO;
 import com.diet.modules.biz.model.vo.DietDishDetailVO;
 import com.diet.modules.biz.model.vo.DietDishVO;
 import com.diet.modules.biz.service.DietDishService;
+import com.diet.modules.common.entity.BaseDeleteDTO;
 import com.diet.modules.common.entity.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,18 +33,18 @@ public class DietDishController {
 
     private final DietDishService dishService;
 
+    @Operation(summary = "菜谱分页查询")
+    @PostMapping("/page")
+    public Result<List<DietDishVO>> pageDishes(@RequestBody DietDishQueryPO po) {
+        IPage<DietDishVO> page = dishService.pageDishes(po);
+        return Result.successPage(page);
+    }
+
     @Operation(summary = "查询菜谱列表")
     @GetMapping("/list")
     public Result<List<DietDishVO>> listDishes(DietDishQueryPO po) {
         List<DietDishVO> list = dishService.listDishes(po);
         return Result.success(list);
-    }
-
-    @Operation(summary = "菜谱分页查询")
-    @GetMapping("/page")
-    public Result<List<DietDishVO>> pageDishes(DietDishQueryPO po) {
-        IPage<DietDishVO> page = dishService.pageDishes(po);
-        return Result.successPage(page);
     }
 
     @Operation(summary = "查询菜谱详情")
@@ -82,16 +83,17 @@ public class DietDishController {
     }
 
     @Operation(summary = "删除菜谱")
-    @DeleteMapping("/delete/{dishId}")
-    public Result<Boolean> deleteDish(@PathVariable Long dishId) {
-        Boolean success = dishService.deleteDish(dishId);
+    @PostMapping("/delete")
+    public Result<Boolean> deleteDish(@RequestBody BaseDeleteDTO dto) {
+        Boolean success = dishService.deleteDishes(dto);
         return Result.success(success);
     }
 
     @Operation(summary = "删除做法分支")
-    @DeleteMapping("/delete/branch/{branchId}")
-    public Result<Boolean> deleteBranch(@PathVariable Long branchId) {
-        Boolean success = dishService.deleteBranch(branchId);
+    @PostMapping("/delete/branch")
+    public Result<Boolean> deleteBranch(@RequestBody BaseDeleteDTO dto) {
+        Boolean success = dishService.deleteBranches(dto);
         return Result.success(success);
     }
 }
+

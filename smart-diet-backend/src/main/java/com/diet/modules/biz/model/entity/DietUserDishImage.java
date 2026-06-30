@@ -15,13 +15,13 @@ import lombok.EqualsAndHashCode;
 @Schema(description = "就餐打卡上传图片关联实体类")
 public class DietUserDishImage extends BaseEntity {
     @TableId(type = IdType.AUTO)
-    @Schema(description = "imageId")
+    @Schema(description = "自制图ID")
     private Long imageId;
     @Schema(description = "家庭组ID")
     private Long groupId;
     @Schema(description = "菜谱ID")
     private Long dishId;
-    @Schema(description = "storageId")
+    @Schema(description = "对应的存储记录文件ID")
     private Long storageId;
 
 }

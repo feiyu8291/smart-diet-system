@@ -1,7 +1,6 @@
 package com.diet.modules.system.service;
 
 import cn.hutool.core.text.CharSequenceUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.diet.modules.common.entity.BasePageQuery;
@@ -36,20 +35,12 @@ public class SysOperationLogService extends ServiceImpl<SysOperationLogMapper, S
      */
     public Page<SysOperationLogVO> pageOperationLogs(BasePageQuery query, String realName, String opType, String opModule) {
         Page<SysOperationLog> page = new Page<>(query.getPageNo(), query.getPageSize());
-        LambdaQueryWrapper<SysOperationLog> wrapper = new LambdaQueryWrapper<>();
-
-        if (CharSequenceUtil.isNotBlank(realName)) {
-            wrapper.like(SysOperationLog::getRealName, realName);
-        }
-        if (CharSequenceUtil.isNotBlank(opType)) {
-            wrapper.eq(SysOperationLog::getOpType, opType);
-        }
-        if (CharSequenceUtil.isNotBlank(opModule)) {
-            wrapper.like(SysOperationLog::getOpModule, opModule);
-        }
-
-        wrapper.orderByDesc(SysOperationLog::getCreateTime);
-        this.page(page, wrapper);
+        this.lambdaQuery()
+                .like(CharSequenceUtil.isNotBlank(realName), SysOperationLog::getRealName, realName)
+                .eq(CharSequenceUtil.isNotBlank(opType), SysOperationLog::getOpType, opType)
+                .like(CharSequenceUtil.isNotBlank(opModule), SysOperationLog::getOpModule, opModule)
+                .orderByDesc(SysOperationLog::getCreateTime)
+                .page(page);
 
         Page<SysOperationLogVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
         List<SysOperationLogVO> voList = new ArrayList<>();

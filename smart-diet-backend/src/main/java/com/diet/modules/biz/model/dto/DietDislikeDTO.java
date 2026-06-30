@@ -12,7 +12,7 @@ import lombok.Data;
 @Data
 @Schema(description = "忌口/偏好设置保存传输对象")
 public class DietDislikeDTO {
-    @Schema(description = "profileId")
+    @Schema(description = "就餐成员档案ID")
     private Long profileId;
     @Schema(description = "家庭组ID")
     private Long groupId;

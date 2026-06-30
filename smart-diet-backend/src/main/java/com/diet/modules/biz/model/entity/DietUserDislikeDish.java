@@ -15,7 +15,7 @@ import lombok.EqualsAndHashCode;
 @Schema(description = "成员忌口/不喜欢菜谱关联实体类")
 public class DietUserDislikeDish extends BaseEntity {
     @TableId(type = IdType.AUTO)
-    @Schema(description = "dislikeId")
+    @Schema(description = "忌口关联ID")
     private Long dislikeId;
     @Schema(description = "关联 user_health_profile.profile_id (就餐人档案)")
     private Long profileId;
@@ -23,7 +23,7 @@ public class DietUserDislikeDish extends BaseEntity {
     private Long groupId;
     @Schema(description = "菜谱ID")
     private Long dishId;
-    @Schema(description = "dislikeCount")
+    @Schema(description = "忌口踩坑次数累计")
     private Integer dislikeCount;
 
 }
