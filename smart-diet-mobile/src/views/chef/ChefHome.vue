@@ -77,6 +77,7 @@ const mockChefDishes = {
 const mealDishes = ref<any[]>([])
 const selectedDishIndex = ref(0)
 const hasPublishedToday = ref(true)
+const currentMealPlanId = ref<number | null>(null)
 
 const fetchChefMenu = async () => {
   if (roleStore.token?.startsWith('mock-')) {
@@ -91,27 +92,41 @@ const fetchChefMenu = async () => {
     // 获取已发布食谱
     const res: any = await request.get(`/api/diet/family-meal-plan/current-day?groupId=${roleStore.groupId}&date=${todayStr}`)
 
-    if (res && res.hasData) {
+    if (res && res.hasMeal) {
       hasPublishedToday.value = true
-      // 提取符合餐次的菜品与步骤
-      const dishesForPeriod = res.meals?.find((m: any) => m.periodCode === activePeriod.value)?.dishes || []
 
-      // 如果后端传了步骤数据就使用，否则从前端 mock
-      mealDishes.value = dishesForPeriod.map((d: any) => {
-        return {
-          id: d.dishId,
-          name: d.name,
-          steps: d.steps && d.steps.length > 0 ? d.steps : (mockChefDishes[activePeriod.value as keyof typeof mockChefDishes]?.find(m => m.id === d.dishId)?.steps || [
-            {num: 1, detail: '洗净主料，热锅冷油进行烹饪。'},
-            {num: 2, detail: '加入辅料及少许食盐、酱油进行调味。'},
-            {num: 3, detail: '熟透后盛出装盘。'}
-          ]),
-          completed: false
-        }
-      })
+      // 根据餐次选择对应的配餐数据 (1-早餐, 2-午餐, 3-晚餐)
+      let periodMeal: any = null
+      if (activePeriod.value === 1) periodMeal = res.breakfast
+      else if (activePeriod.value === 2) periodMeal = res.lunch
+      else if (activePeriod.value === 3) periodMeal = res.dinner
+
+      if (periodMeal && periodMeal.hasMeal) {
+        currentMealPlanId.value = periodMeal.mealPlan?.mealPlanId || null
+        const dishesForPeriod = periodMeal.dishes || []
+
+        mealDishes.value = dishesForPeriod.map((d: any) => {
+          return {
+            id: d.branchId, // 关联做法分支 ID 作为打卡的主键 ID
+            name: d.branchName,
+            steps: d.steps && d.steps.length > 0
+                ? d.steps.map((s: any) => ({num: s.stepNum, detail: s.stepDetail}))
+                : (mockChefDishes[activePeriod.value as keyof typeof mockChefDishes]?.find(m => m.id === d.dishId)?.steps || [
+                  {num: 1, detail: '洗净主料，热锅冷油进行烹饪。'},
+                  {num: 2, detail: '加入辅料及少许食盐、酱油进行调味。'},
+                  {num: 3, detail: '熟透后盛出装盘。'}
+                ]),
+            completed: d.cookFlag === 1
+          }
+        })
+      } else {
+        mealDishes.value = []
+        currentMealPlanId.value = null
+      }
     } else {
-      // 联调时后端尚未生成，为演示通畅也展示 mock
-      mealDishes.value = mockChefDishes[activePeriod.value as keyof typeof mockChefDishes] || []
+      hasPublishedToday.value = false
+      mealDishes.value = []
+      currentMealPlanId.value = null
     }
   } catch (err) {
     console.error('拉取已发布配餐失败', err)
@@ -128,9 +143,17 @@ const handlePeriodChange = () => {
 }
 
 // 完成一道菜的烹饪
-const completeDish = (idx: number) => {
-  mealDishes.value[idx].completed = true
-  showSuccessToast(`${mealDishes.value[idx].name} 烹饪完毕！`)
+const completeDish = async (idx: number) => {
+  const dish = mealDishes.value[idx]
+  if (currentMealPlanId.value && !roleStore.token?.startsWith('mock-')) {
+    try {
+      await request.post(`/api/diet/family-meal-plan/cook-dish?mealPlanId=${currentMealPlanId.value}&branchId=${dish.id}&cookFlag=1`)
+    } catch (err) {
+      console.error('保存做菜完成状态失败', err)
+    }
+  }
+  dish.completed = true
+  showSuccessToast(`${dish.name} 烹饪完毕！`)
 
   // 检查是否这顿饭所有的菜都做完了
   const allDone = mealDishes.value.every(d => d.completed)

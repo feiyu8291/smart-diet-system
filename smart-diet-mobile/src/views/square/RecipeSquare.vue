@@ -26,186 +26,23 @@ const wishForm = ref({
   wishNote: ''
 })
 
-// 模拟的高颜值菜谱及做法分支数据
-const mockDishes = [
-  {
-    dishId: 2,
-    dishName: '西兰花炒牛肉',
-    cuisineType: '湘菜',
-    dietModeName: '轻食减脂',
-    totalLikes: 144,
-    coverEmoji: '🥦🥩',
-    branches: [
-      {
-        branchId: 1,
-        branchName: '无油低卡健身版西兰花牛肉',
-        creatorName: '张大厨',
-        calories: 85,
-        protein: 16.2,
-        fat: 1.8,
-        carbs: 2.5,
-        likes: 88,
-        collects: 32,
-        liked: false,
-        collected: false,
-        ingredients: [
-          {name: '牛里脊', amount: '150g', isMain: true},
-          {name: '西兰花', amount: '150g', isMain: true},
-          {name: '生抽', amount: '2ml', isMain: false},
-          {name: '食盐', amount: '1g', isMain: false}
-        ],
-        steps: [
-          '将牛里脊横纹切成薄片，西兰花切成大小均匀的小朵。',
-          '锅中注入清水烧开，将西兰花与牛肉片一同下锅用沸水焯熟，捞出沥干。',
-          '淋入2ml生抽，撒入1g食盐，快速凉拌均匀即可出盘。'
-        ]
-      },
-      {
-        branchId: 2,
-        branchName: '经典传统水淀粉勾芡西兰花牛肉',
-        creatorName: '系统预置',
-        calories: 130,
-        protein: 14.0,
-        fat: 5.5,
-        carbs: 6.2,
-        likes: 56,
-        collects: 18,
-        liked: false,
-        collected: false,
-        ingredients: [
-          {name: '牛里脊', amount: '150g', isMain: true},
-          {name: '西兰花', amount: '150g', isMain: true},
-          {name: '食用油', amount: '15g', isMain: false},
-          {name: '生抽', amount: '10ml', isMain: false},
-          {name: '食盐', amount: '2g', isMain: false}
-        ],
-        steps: [
-          '牛肉片加入少许淀粉、生抽、料酒抓匀腌制10分钟。',
-          '西兰花焯水30秒捞出沥干备用。',
-          '热锅下油，下姜蒜末爆香，倒入牛肉片大火快速滑炒至变色。',
-          '倒入西兰花及调味料翻炒，最后淋入少许水淀粉勾芡收汁装盘。'
-        ]
-      }
-    ]
-  },
-  {
-    dishId: 3,
-    dishName: '西红柿炒鸡蛋',
-    cuisineType: '闽菜',
-    dietModeName: '正常膳食',
-    totalLikes: 162,
-    coverEmoji: '🍅🍳',
-    branches: [
-      {
-        branchId: 3,
-        branchName: '零卡糖无油版西红柿炒蛋',
-        creatorName: '张大厨',
-        calories: 75,
-        protein: 6.8,
-        fat: 2.5,
-        carbs: 3.2,
-        likes: 120,
-        collects: 45,
-        liked: false,
-        collected: true,
-        ingredients: [
-          {name: '西红柿', amount: '200g', isMain: true},
-          {name: '鸡蛋', amount: '120g (2个)', isMain: true},
-          {name: '食用油', amount: '2g', isMain: false},
-          {name: '零卡糖', amount: '2g', isMain: false},
-          {name: '食盐', amount: '1.5g', isMain: false}
-        ],
-        steps: [
-          '西红柿切小块，鸡蛋打散。',
-          '不粘锅刷薄薄2g油，倒入蛋液快速划散至半熟盛出。',
-          '下西红柿炒出沙，倒入蛋碎，撒入零卡糖与盐炒匀出锅。'
-        ]
-      },
-      {
-        branchId: 4,
-        branchName: '传统多油多甜本味西红柿炒蛋',
-        creatorName: '家庭私房',
-        calories: 155,
-        protein: 6.2,
-        fat: 11.2,
-        carbs: 8.5,
-        likes: 42,
-        collects: 15,
-        liked: false,
-        collected: false,
-        ingredients: [
-          {name: '西红柿', amount: '200g', isMain: true},
-          {name: '鸡蛋', amount: '120g (2个)', isMain: true},
-          {name: '食用油', amount: '12g', isMain: false},
-          {name: '白砂糖', amount: '8g', isMain: false},
-          {name: '食盐', amount: '3g', isMain: false}
-        ],
-        steps: [
-          '鸡蛋液打入碗中，加少许盐打散。西红柿滚刀切块。',
-          '热锅多油，倒入蛋液大火炒出大蓬松状态后捞出。',
-          '留底油下西红柿，加糖加盐，炒出大量酸甜汤汁。',
-          '倒入捞出的鸡蛋，大火翻炒10秒让蛋液吸饱汤汁即可。'
-        ]
-      }
-    ]
-  },
-  {
-    dishId: 1,
-    dishName: '清蒸水煮鸡胸肉',
-    cuisineType: '粤菜',
-    dietModeName: '轻食减脂',
-    totalLikes: 30,
-    coverEmoji: '🥬🍗',
-    branches: [
-      {
-        branchId: 5,
-        branchName: '主厨秘制无油蒸鸡胸',
-        creatorName: '张大厨',
-        calories: 95,
-        protein: 18.0,
-        fat: 1.5,
-        carbs: 2.0,
-        likes: 30,
-        collects: 8,
-        liked: false,
-        collected: false,
-        ingredients: [
-          {name: '鸡胸肉', amount: '200g', isMain: true},
-          {name: '西兰花', amount: '50g', isMain: true},
-          {name: '生抽', amount: '3ml', isMain: false},
-          {name: '黑胡椒', amount: '1g', isMain: false}
-        ],
-        steps: [
-          '鸡胸肉横切薄片，加入少许料酒腌制去腥。',
-          '冷水上锅，将鸡肉与西兰花大火清蒸8分钟。',
-          '取出后，撒上黑胡椒粉，蘸少许生抽食用。'
-        ]
-      }
-    ]
-  }
-]
 
 const dishesList = ref<any[]>([])
 
-// 联调及Mock载入
+// 联调及数据载入
 const fetchDishes = async () => {
   loading.value = true
   try {
-    if (roleStore.token?.startsWith('mock-')) {
-      dishesList.value = JSON.parse(JSON.stringify(mockDishes))
-      return
-    }
-
     // 后端接口联调：获取所有菜品及其烹饪分支
     const res: any = await request.get('/api/diet/dish/list-branches')
     if (res && res.length > 0) {
       dishesList.value = res
     } else {
-      dishesList.value = JSON.parse(JSON.stringify(mockDishes))
+      dishesList.value = []
     }
   } catch (err) {
-    console.error('获取做法广场数据失败，采用Mock兜底', err)
-    dishesList.value = JSON.parse(JSON.stringify(mockDishes))
+    console.error('获取做法广场数据失败', err)
+    dishesList.value = []
   } finally {
     loading.value = false
   }

@@ -21,5 +21,9 @@ public class DietFamilyMealPlanDish extends BaseEntity {
     private Long mealPlanId;
     @Schema(description = "做法分支ID")
     private Long branchId;
+    @Schema(description = "关联菜品主键ID")
+    private Long dishId;
+    @Schema(description = "是否烹饪完成(0否1是)")
+    private Integer cookFlag;
 
 }

@@ -1,14 +1,17 @@
 package com.diet.modules.biz.model.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.diet.modules.biz.model.vo.DietDishStepVO;
 import com.diet.modules.common.entity.BaseEntity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 菜谱烹饪做法分支实体类
@@ -55,5 +58,13 @@ public class DietDishCookingBranch extends BaseEntity {
 
     @Schema(description = "每100g合算碳水(g)")
     private BigDecimal carbs;
+
+    @TableField(exist = false)
+    @Schema(description = "是否烹饪完成(0否1是)")
+    private Integer cookFlag;
+
+    @TableField(exist = false)
+    @Schema(description = "烹饪步骤列表")
+    private List<DietDishStepVO> steps;
 
 }

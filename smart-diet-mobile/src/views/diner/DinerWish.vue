@@ -7,17 +7,8 @@ import {showSuccessToast, showToast} from 'vant'
 const roleStore = useRoleStore()
 const loading = ref(false)
 
-// 菜谱词典（用于提供给用户搜索和选择）
-const mockDishes = [
-  {dishId: 1, name: '红烧肉', type: '放纵大餐'},
-  {dishId: 2, name: '水煮鱼', type: '正常饮食'},
-  {dishId: 3, name: '西红柿炒鸡蛋', type: '正常饮食'},
-  {dishId: 4, name: '清蒸鲈鱼', type: '轻食减脂'},
-  {dishId: 5, name: '香煎鸡胸肉', type: '轻食减脂'},
-  {dishId: 6, name: '麻婆豆腐', type: '正常饮食'},
-  {dishId: 7, name: '糖醋排骨', type: '放纵大餐'},
-  {dishId: 8, name: '白灼西兰花', type: '轻食减脂'}
-]
+// 菜品词典（用于提供给用户搜索和选择），在挂载时动态获取
+const allDishes = ref<any[]>([])
 
 // 绑定的心愿列表与不喜欢列表
 const wishList = ref<any[]>([])
@@ -43,20 +34,20 @@ const dislikeForm = ref({
 const showDishSearch = ref(false)
 const searchKey = ref('')
 const searchTarget = ref<'wish' | 'dislike'>('wish')
-const filteredDishes = ref<any[]>(mockDishes)
+const filteredDishes = ref<any[]>([])
 
 const onSearchInput = () => {
   if (!searchKey.value) {
-    filteredDishes.value = mockDishes
+    filteredDishes.value = allDishes.value
   } else {
-    filteredDishes.value = mockDishes.filter(d => d.name.includes(searchKey.value))
+    filteredDishes.value = allDishes.value.filter(d => d.name.includes(searchKey.value))
   }
 }
 
 const openDishSelect = (target: 'wish' | 'dislike') => {
   searchTarget.value = target
   searchKey.value = ''
-  filteredDishes.value = mockDishes
+  filteredDishes.value = allDishes.value
   showDishSearch.value = true
 }
 
@@ -71,27 +62,8 @@ const selectDish = (dish: any) => {
   showDishSearch.value = false
 }
 
-// 模拟加载及提交接口
+// 联调数据获取
 const fetchLists = async () => {
-  if (roleStore.token?.startsWith('mock-')) {
-    // 模拟数据展示
-    const localWishes = JSON.parse(localStorage.getItem('mock_wishes') || '[]')
-    const localDislikes = JSON.parse(localStorage.getItem('mock_dislikes') || '[]')
-
-    const defaultWishes = [
-      {id: 201, dishName: '红烧肉', wishDate: '2026-06-27', note: '周末想解解馋，吃一次放纵餐！'},
-      {id: 202, dishName: '水煮鱼', wishDate: '2026-06-29', note: '想吃麻辣口的'}
-    ]
-    const defaultDislikes = [
-      {id: 301, dishName: '香菜拌牛肉', count: 1},
-      {id: 302, dishName: '洋葱炒肉', count: 2}
-    ]
-
-    wishList.value = [...localWishes, ...defaultWishes]
-    dislikeList.value = [...localDislikes, ...defaultDislikes]
-    return
-  }
-
   loading.value = true
   try {
     const wishesRes = await request.get(`/api/diet/wish-dish/list?profileId=${roleStore.profileId}`)
@@ -100,9 +72,29 @@ const fetchLists = async () => {
     const dislikeRes = await request.get(`/api/diet/dislike-dish/list?profileId=${roleStore.profileId}`)
     dislikeList.value = dislikeRes.data || dislikeRes || []
   } catch (err) {
-    console.error('拉取心愿/忌口列表失败，使用本地备用数据', err)
+    console.error('拉取心愿/忌口列表失败', err)
+    wishList.value = []
+    dislikeList.value = []
   } finally {
     loading.value = false
+  }
+}
+
+// 动态获取系统菜品列表
+const fetchSystemDishes = async () => {
+  try {
+    const res: any = await request.get('/api/diet/dish/list')
+    const list = res.data || res || []
+    allDishes.value = list.map((d: any) => ({
+      dishId: d.dishId,
+      name: d.dishName,
+      type: d.cuisineType || '其他'
+    }))
+    filteredDishes.value = allDishes.value
+  } catch (err) {
+    console.error('获取系统菜品列表失败', err)
+    allDishes.value = []
+    filteredDishes.value = []
   }
 }
 
@@ -113,30 +105,15 @@ const submitWish = async () => {
   }
 
   try {
-    if (roleStore.token?.startsWith('mock-')) {
-      const localWishes = JSON.parse(localStorage.getItem('mock_wishes') || '[]')
-      const newWish = {
-        id: Date.now(),
-        dishName: wishForm.value.dishName,
-        wishDate: wishForm.value.wishDate,
-        wishNote: wishForm.value.wishNote
-      }
-      localWishes.unshift(newWish)
-      localStorage.setItem('mock_wishes', JSON.stringify(localWishes))
-
-      wishList.value.unshift(newWish)
-      showSuccessToast('心愿提交成功')
-    } else {
-      await request.post('/api/diet/wish-dish/add', {
-        profileId: roleStore.profileId,
-        groupId: roleStore.groupId,
-        dishId: wishForm.value.dishId,
-        wishDate: wishForm.value.wishDate,
-        wishNote: wishForm.value.wishNote
-      })
-      showSuccessToast('心愿提交成功')
-      fetchLists()
-    }
+    await request.post('/api/diet/wish-dish/add', {
+      profileId: roleStore.profileId,
+      groupId: roleStore.groupId,
+      dishId: wishForm.value.dishId,
+      wishDate: wishForm.value.wishDate,
+      wishNote: wishForm.value.wishNote
+    })
+    showSuccessToast('心愿提交成功')
+    fetchLists()
     showWishDialog.value = false
     wishForm.value = {dishId: null, dishName: '', wishDate: new Date().toISOString().split('T')[0], wishNote: ''}
   } catch (err) {
@@ -151,30 +128,13 @@ const submitDislike = async () => {
   }
 
   try {
-    if (roleStore.token?.startsWith('mock-')) {
-      const localDislikes = JSON.parse(localStorage.getItem('mock_dislikes') || '[]')
-      const existing = localDislikes.find((d: any) => d.dishName === dislikeForm.value.dishName)
-      if (existing) {
-        existing.count++
-      } else {
-        localDislikes.unshift({
-          id: Date.now(),
-          dishName: dislikeForm.value.dishName,
-          count: 1
-        })
-      }
-      localStorage.setItem('mock_dislikes', JSON.stringify(localDislikes))
-      fetchLists()
-      showSuccessToast('不爱吃偏好已记录')
-    } else {
-      await request.post('/api/diet/dislike-dish/add', {
-        profileId: roleStore.profileId,
-        groupId: roleStore.groupId,
-        dishId: dislikeForm.value.dishId
-      })
-      showSuccessToast('已申报不喜欢菜品')
-      fetchLists()
-    }
+    await request.post('/api/diet/dislike-dish/add', {
+      profileId: roleStore.profileId,
+      groupId: roleStore.groupId,
+      dishId: dislikeForm.value.dishId
+    })
+    showSuccessToast('已申报不喜欢菜品')
+    fetchLists()
     showDislikeDialog.value = false
     dislikeForm.value = {dishId: null, dishName: ''}
   } catch (err) {
@@ -184,18 +144,9 @@ const submitDislike = async () => {
 
 const deleteWish = async (id: number) => {
   try {
-    if (roleStore.token?.startsWith('mock-')) {
-      const localWishes = JSON.parse(localStorage.getItem('mock_wishes') || '[]')
-      const filtered = localWishes.filter((item: any) => item.id !== id)
-      localStorage.setItem('mock_wishes', JSON.stringify(filtered))
-
-      wishList.value = wishList.value.filter(item => item.id !== id)
-      showSuccessToast('已撤销心愿')
-    } else {
-      await request.delete(`/api/diet/wish-dish/${id}`)
-      showSuccessToast('已撤销心愿')
-      fetchLists()
-    }
+    await request.delete(`/api/diet/wish-dish/${id}`)
+    showSuccessToast('已撤销心愿')
+    fetchLists()
   } catch (err) {
     console.error(err)
   }
@@ -203,18 +154,9 @@ const deleteWish = async (id: number) => {
 
 const deleteDislike = async (id: number) => {
   try {
-    if (roleStore.token?.startsWith('mock-')) {
-      const localDislikes = JSON.parse(localStorage.getItem('mock_dislikes') || '[]')
-      const filtered = localDislikes.filter((item: any) => item.id !== id)
-      localStorage.setItem('mock_dislikes', JSON.stringify(filtered))
-
-      dislikeList.value = dislikeList.value.filter(item => item.id !== id)
-      showSuccessToast('已移除记录')
-    } else {
-      await request.delete(`/api/diet/dislike-dish/${id}`)
-      showSuccessToast('已移出黑名单')
-      fetchLists()
-    }
+    await request.delete(`/api/diet/dislike-dish/${id}`)
+    showSuccessToast('已移出黑名单')
+    fetchLists()
   } catch (err) {
     console.error(err)
   }
@@ -222,6 +164,7 @@ const deleteDislike = async (id: number) => {
 
 onMounted(() => {
   fetchLists()
+  fetchSystemDishes()
 })
 </script>
 

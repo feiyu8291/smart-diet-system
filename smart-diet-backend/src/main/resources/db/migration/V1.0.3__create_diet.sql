@@ -512,7 +512,9 @@ CREATE TABLE IF NOT EXISTS diet_family_meal_plan_dish
 (
     relation_id  BIGSERIAL NOT NULL,
     meal_plan_id BIGINT    NOT NULL,
+    dish_id      BIGINT    NOT NULL,
     branch_id    BIGINT    NOT NULL,
+    cook_flag    SMALLINT  NOT NULL DEFAULT 0,
     del_flag     SMALLINT  NOT NULL DEFAULT 0,
     create_by    VARCHAR(64),
     update_by    VARCHAR(64),
@@ -524,7 +526,9 @@ CREATE TABLE IF NOT EXISTS diet_family_meal_plan_dish
 COMMENT ON TABLE diet_family_meal_plan_dish IS '业务-每日生成食谱-菜品关联表';
 COMMENT ON COLUMN diet_family_meal_plan_dish.relation_id IS '主键ID';
 COMMENT ON COLUMN diet_family_meal_plan_dish.meal_plan_id IS '膳食计划ID';
+COMMENT ON COLUMN diet_family_meal_plan_dish.dish_id IS '关联菜品主键ID';
 COMMENT ON COLUMN diet_family_meal_plan_dish.branch_id IS '包含的做法分支ID';
+COMMENT ON COLUMN diet_family_meal_plan_dish.cook_flag IS '是否烹饪完成(0否1是)';
 COMMENT ON COLUMN diet_family_meal_plan_dish.del_flag IS '删除标识(0否1是)';
 COMMENT ON COLUMN diet_family_meal_plan_dish.create_by IS '创建人';
 COMMENT ON COLUMN diet_family_meal_plan_dish.update_by IS '更新人';

@@ -7,46 +7,9 @@ import {showToast} from 'vant'
 const roleStore = useRoleStore()
 const loading = ref(false)
 
-// 模拟菜谱数据（添加 mealPlanId）
-const mockMeals = [
-  {
-    mealPlanId: 101,
-    periodName: '早餐 🥞',
-    periodCode: 1,
-    dietModeName: '轻食减脂',
-    dishes: [
-      {id: 1011, name: '水煮蛋', portion: '1 个 (约50g)', note: '优质蛋白质，饱腹感强', calories: 78, protein: 7.0, fat: 5.0, carbs: 0.5},
-      {id: 1012, name: '全麦面包', portion: '2 片 (约60g)', note: '复合碳水，缓释能量', calories: 156, protein: 5.5, fat: 1.2, carbs: 28.0},
-      {id: 1013, name: '低脂牛奶', portion: '1 杯 (250ml)', note: '补充钙质与水分', calories: 120, protein: 8.0, fat: 3.0, carbs: 11.0}
-    ]
-  },
-  {
-    mealPlanId: 102,
-    periodName: '午餐 🥗',
-    periodCode: 2,
-    dietModeName: '轻食减脂',
-    dishes: [
-      {id: 1021, name: '香煎鸡胸肉', portion: '150 克', note: '少油双面煎至金黄', calories: 198, protein: 34.0, fat: 4.5, carbs: 0.0},
-      {id: 1022, name: '清炒西兰花', portion: '120 克', note: '丰富膳食纤维与微量元素', calories: 45, protein: 3.6, fat: 0.8, carbs: 7.2},
-      {id: 1023, name: '黑米饭', portion: '130 克', note: '健康粗粮主食', calories: 168, protein: 4.2, fat: 1.0, carbs: 36.0}
-    ]
-  },
-  {
-    mealPlanId: 103,
-    periodName: '晚餐 🐟',
-    periodCode: 3,
-    dietModeName: '轻食减脂',
-    dishes: [
-      {id: 1031, name: '清蒸鲈鱼', portion: '180 克', note: '富含优质不饱和脂肪酸', calories: 210, protein: 32.0, fat: 6.2, carbs: 0.0},
-      {id: 1032, name: '白灼生菜', portion: '150 克', note: '低卡排毒，少许生抽调味', calories: 25, protein: 1.8, fat: 0.3, carbs: 4.5},
-      {id: 1033, name: '蒸紫薯', portion: '100 克', note: '富含花青素优质碳水', calories: 86, protein: 1.6, fat: 0.2, carbs: 20.0}
-    ]
-  }
-]
-
 const meals = ref<any[]>([])
 const dailyTargetCalories = ref(1500)
-const plannedCalories = ref(1086)
+const plannedCalories = ref(0)
 
 // 打卡相关状态
 const reasonOptions = ['外出就餐', '工作加班', '身体不适', '胃口欠佳', '其他原因']
@@ -54,24 +17,21 @@ const showReasonSheet = ref(false)
 const selectedReason = ref('')
 const skipNote = ref('')
 const currentMealPlanId = ref<number | null>(null)
-const feedbackMap = ref<Record<number, { eatStatus: number; skipReason?: string; skipNote?: string }>>({
-  101: {eatStatus: 1} // 默认初始化早餐已餐打卡
-})
+const feedbackMap = ref<Record<number, { eatStatus: number; skipReason?: string; skipNote?: string }>>({})
 
 const getFeedback = (mealPlanId: number) => {
   return feedbackMap.value[mealPlanId]
 }
 
 const fetchData = async () => {
-  if (roleStore.token?.startsWith('mock-')) {
-    meals.value = mockMeals
-    return
-  }
-
   loading.value = true
   try {
     const todayStr = new Date().toISOString().split('T')[0]
-    const res: any = await request.get(`/api/diet/family-meal-plan/portions?groupId=${roleStore.groupId}&profileId=${roleStore.profileId}&date=${todayStr}`)
+    const res: any = await request.post('/api/diet/family-meal-plan/portions', {
+      groupId: roleStore.groupId,
+      profileId: roleStore.profileId,
+      date: todayStr
+    })
 
     if (res && res.length > 0) {
       meals.value = res
@@ -83,7 +43,8 @@ const fetchData = async () => {
       })
       plannedCalories.value = Math.round(totalCal)
     } else {
-      meals.value = mockMeals
+      meals.value = []
+      plannedCalories.value = 0
     }
 
     // 拉取打卡状态
@@ -110,8 +71,9 @@ const fetchData = async () => {
       }
     }
   } catch (error) {
-    console.error('获取分餐数据失败，使用备用演示数据', error)
-    meals.value = mockMeals
+    console.error('获取分餐数据失败', error)
+    meals.value = []
+    plannedCalories.value = 0
   } finally {
     loading.value = false
   }
